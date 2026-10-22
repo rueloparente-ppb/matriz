@@ -8,10 +8,17 @@
   <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js" defer></script>
 </head>
-<body>
+<body th:hx-headers='${_csrf != null} ? |{"X-CSRF-TOKEN":"${_csrf.token}"}| : null'>
 <nav class="navbar navbar-expand navbar-dark bg-dark px-3">
   <a class="navbar-brand" href="/">Jira clone</a>
-  <div id="navbar-slot" class="ms-auto"></div>
+  <div id="navbar-slot" class="ms-auto d-flex align-items-center">
+    <th:block th:if="${currentUser != null}">
+      <span class="navbar-text me-3" th:text="${currentUser.displayName}">User</span>
+      <form th:action="@{/logout}" method="post" class="m-0">
+        <button type="submit" class="btn btn-outline-light btn-sm">Log out</button>
+      </form>
+    </th:block>
+  </div>
 </nav>
 <main class="container-fluid py-3" th:replace="${content}">content</main>
 </body>
