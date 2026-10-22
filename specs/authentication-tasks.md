@@ -21,7 +21,7 @@ Global MVP stack order (each spec's first PR is based on the previous spec's las
 
 Budget: ~300 production lines per PR (the user's budget, which replaces the skill default of 600). Tests, migrations' test data, templates' tests and docs are not counted.
 
-**Estimated size:** skeleton (not counted) + ~180–260 source lines — stack of 2 PRs
+**Estimated size:** skeleton (not counted) + ~200–280 source lines — stack of 2 PRs
 
 ## PR stack
 
@@ -36,7 +36,7 @@ Budget: ~300 production lines per PR (the user's budget, which replaces the skil
 
 **Base:** PR 1
 **Groups:** 2, 3
-**Estimated source lines:** ~180–260
+**Estimated source lines:** ~200–280
 **Merge safety:** Additive; there are no other pages to break. After merge every page requires login.
 
 ## Tasks
@@ -61,12 +61,13 @@ Budget: ~300 production lines per PR (the user's budget, which replaces the skil
 **Commit intent:** A users table with case-insensitive unique usernames, display names and bcrypt hashes, plus seeded users. No login yet.
 **PR:** 2
 **Dependencies:** 1
-**Estimated source lines:** ~60–90
-**Requirements:** AUTH-7, AUTH-8 (lookup part)
+**Estimated source lines:** ~80–110
+**Requirements:** AUTH-7, AUTH-8 (lookup part), AUTH-9
 
 - [ ] 2.1 Flyway migration for users (unique index on lower(username), display name, password hash). Check: migration test inserts two usernames differing only by case and expects a unique violation.
 - [ ] 2.2 Seed migration with a few users and bcrypt hashes; document seeded credentials in the README. Check: test reads seeded users and asserts stored hash ≠ plain password and matches with bcrypt.
 - [ ] 2.3 User entity, repository with case-insensitive lookup, and a user-details service. Check: test finds `ALICE` when stored as `alice`.
+- [ ] 2.4 Public `IdentityApi` (current user, find user, list users) returning the `UserRef` record (id, username, displayName); entity, `UserDetails` and password hash stay in `identity/core`. The current-user lookup reads the Spring Security principal only inside `identity`. Check: unit test that `currentUser()` returns a `UserRef`; architecture test for AUTH-9 (no other module imports `org.springframework.security` user types or `identity.core`).
 
 ### 3. Form login, logout, CSRF and htmx handling
 
@@ -91,5 +92,6 @@ Budget: ~300 production lines per PR (the user's budget, which replaces the skil
 | AUTH-6 | 3 |
 | AUTH-7 | 2, 3 |
 | AUTH-8 | 2, 3 |
+| AUTH-9 | 2 |
 
 The groups run strictly in order 1 → 2 → 3. No group depends on a later PR.
