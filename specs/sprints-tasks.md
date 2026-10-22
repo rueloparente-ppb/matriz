@@ -5,7 +5,7 @@
 
 ## Overview
 
-These are MRs 9–10 in the global stack: first the sprint lifecycle (create, list, start, complete), then issue membership and the board filter. History entries use the recorder from activity-history group 1.
+These are MRs 9–10 in the global stack: first the sprint lifecycle (create, list, start, complete), then issue membership and the board filter. Sprints publish `IssueSprintChanged`; the history listener from activity-history group 1 records it. Module ownership follows [architecture.md](../docs/architecture.md).
 
 **Estimated size:** ~380–540 source lines — stack of 2 PRs
 
@@ -35,7 +35,7 @@ These are MRs 9–10 in the global stack: first the sprint lifecycle (create, li
 **Estimated source lines:** ~40–70
 **Requirements:** SPR-2 (uniqueness), SPR-5
 
-- [ ] 1.1 Flyway migration: sprints (project FK, name, state); unique (project, lower(name)); partial unique index on project where state = ACTIVE; `issues.sprint_id` nullable FK. Check: migration test for both constraints.
+- [ ] 1.1 Flyway migration: sprints (project FK, name, state); unique (project, lower(name)); partial unique index on project where state = ACTIVE; `sprint_issue` (issue_id PK, sprint_id FK), owned by `sprints` (architecture AD-4). Check: migration test for both constraints.
 - [ ] 1.2 Entity, state enum and repository. Check: repository test.
 
 ### 2. Sprint lifecycle service and page
@@ -48,7 +48,7 @@ These are MRs 9–10 in the global stack: first the sprint lifecycle (create, li
 
 - [ ] 2.1 Create with trimmed name 1–100; a duplicate (from the DB constraint) gives `422`; the same name in another project is accepted. Check: tests for SPR-1, SPR-2.
 - [ ] 2.2 Start and complete transitions; an invalid transition gives `409`; the active-sprint index violation gives `409`. Check: tests for SPR-3, SPR-4, SPR-6, plus a concurrent start test (SPR-5).
-- [ ] 2.3 Completion clears `sprint_id` on non-`DONE` issues and records `SPRINT_CHANGED` for each, in one transaction. Check: tests for SPR-7, SPR-8 (seed membership directly in test setup, because the endpoint arrives in group 3).
+- [ ] 2.3 Completion reads statuses through `IssuesApi`, deletes the `sprint_issue` rows of non-`DONE` issues, calls `IssuesApi.markUpdated`, and publishes `IssueSprintChanged` for each, in one transaction. Add the `history` module's synchronous listener for `IssueSprintChanged` (kind `SPRINT_CHANGED`). Check: tests for SPR-7, SPR-8 (seed membership directly in test setup, because the endpoint arrives in group 3).
 - [ ] 2.4 Sprints page (list with state and issue count, create form, start and complete buttons), a navbar link, unknown project and unauthenticated access. Check: tests for SPR-17, SPR-18.
 
 ### 3. Issue sprint assignment
@@ -60,7 +60,7 @@ These are MRs 9–10 in the global stack: first the sprint lifecycle (create, li
 **Requirements:** SPR-9, SPR-10, SPR-11, SPR-12, SPR-13, SPR-14
 
 - [ ] 3.1 Resolve the issue and sprint (a sprint of another project gives `404`); a `COMPLETED` sprint gives `422`; `none` or empty clears it; the current sprint is a no-op. Check: tests for SPR-9, SPR-10, SPR-11, SPR-12, SPR-13.
-- [ ] 3.2 Record `SPRINT_CHANGED` with old and new sprint names, and update `updatedAt` only on change. Check: test for SPR-14.
+- [ ] 3.2 On a real change, publish `IssueSprintChanged` with old and new sprint names and call `IssuesApi.markUpdated`. Check: test for SPR-14.
 - [ ] 3.3 Picker fragment on the detail page (planned and active sprints of the project, plus "None"). Check: manual check in the browser.
 
 ### 4. Board sprint filter

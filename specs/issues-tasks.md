@@ -42,8 +42,8 @@ Issues are MRs 3–5 in the global stack: create and view, then the list with fi
 **Estimated source lines:** ~80–110
 **Requirements:** ISS-5, ISS-6 (part of ISS-1, ISS-3)
 
-- [ ] 1.1 Flyway migration: issues (project FK, number, unique (project, number), title, description, type, priority, status, assignee FK nullable, reporter FK, created_at, updated_at), plus a per-project next-number counter. Check: migration applies.
-- [ ] 1.2 Number allocation inside the create transaction, after validation (atomic counter increment on the project row). Check: concurrency test with N parallel creates gives N distinct consecutive numbers (ISS-5); two projects each start at 1 (ISS-6).
+- [ ] 1.1 Flyway migration: issues (project FK, number, unique (project, number), title, description, type, priority, status, assignee FK nullable, reporter FK, created_at, updated_at) and `issue_counter` (project_id PK, last_number), as in [database.md](../docs/database.md). Check: migration applies.
+- [ ] 1.2 Number allocation inside the create transaction, after validation, by an atomic upsert on `issue_counter` (the `issues` module never writes `project`, see architecture AD-5). Check: concurrency test with N parallel creates gives N distinct consecutive numbers (ISS-5); two projects each start at 1 (ISS-6).
 - [ ] 1.3 Entity, enums (type, priority, status) and repository lookup by (project key, number). Check: repository test.
 
 ### 2. Create form, create and detail page
@@ -93,7 +93,7 @@ Issues are MRs 3–5 in the global stack: create and view, then the list with fi
 - [ ] 5.1 Field dispatch: unknown field name → `404`; protected fields have no route. Check: tests for ISS-18.
 - [ ] 5.2 Per-field parse and validate, and set only when the value differs (`updatedAt` touched only then). Check: tests for ISS-15, ISS-16 (stored value and `updatedAt` unchanged), ISS-17.
 - [ ] 5.3 Assignee `none` or empty clears it; a nonexistent user returns `422`. Check: tests for ISS-19.
-- [ ] 5.4 A single service entry point that the board and the history recorder can reuse. Check: documented in the commit; exercised by board group 2.
+- [ ] 5.4 Public `IssuesApi` (find issue, `changeStatus`, `markUpdated`) plus event records `IssueCreated` and `IssueFieldChanged` (ids and display values), published synchronously from create and from real changes only. Check: test with `PublishedEvents` (or an event capture) that a no-op or `422` publishes nothing; exercised by board group 2.
 
 ### 6. Inline edit fragments
 
