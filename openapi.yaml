@@ -1,0 +1,324 @@
+openapi: 3.1.0
+info:
+  title: Jira Clone MVP — Issues
+  version: 0.1.0
+  summary: Two issue operations of the Jira clone MVP.
+  description: |
+    The application is server-rendered (Thymeleaf + htmx). These operations are
+    the same HTTP endpoints the browser uses: requests are HTML form posts or
+    query strings, and responses are HTML pages or htmx fragments, not JSON.
+    There is deliberately no separate JSON API (see `AGENTS.md`).
+
+    Behaviour is owned by `specs/issues-spec.md`; requirement IDs (`ISS-n`) are
+    cited in descriptions. Authentication rules are in
+    `specs/authentication-spec.md`.
+
+    **htmx:** a request with header `HX-Request: true` receives only the
+    fragment that changed; a normal request receives the full page.
+servers:
+  - url: http://localhost:8080
+    description: Local (docker compose)
+security:
+  - sessionCookie: []
+tags:
+  - name: Issues
+    description: Create and list issues in a project.
+
+paths:
+  /projects/{projectKey}/issues:
+    parameters:
+      - $ref: '#/components/parameters/ProjectKey'
+      - $ref: '#/components/parameters/HxRequest'
+
+    get:
+      tags: [Issues]
+      operationId: listIssues
+      summary: List a project's issues with filters, search and paging
+      description: |
+        Returns the project's issues, newest number first, 25 per page (ISS-9).
+        Filters combine with AND (ISS-10); `q` is combined with filters by AND
+        (ISS-11). A missing filter means no restriction. An invalid filter value
+        is rejected, never ignored (ISS-12). An unknown project returns `404`
+        before any parameter is validated.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/IssueStatus'
+        - name: type
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/IssueType'
+        - name: assignee
+          in: query
+          required: false
+          description: User id, or `none` for unassigned issues.
+          schema:
+            oneOf:
+              - type: string
+                pattern: '^[0-9]+$'
+              - type: string
+                const: none
+          examples:
+            user:
+              value: '42'
+            unassigned:
+              value: none
+        - name: q
+          in: query
+          required: false
+          description: Case-insensitive substring matched against the title or the issue key (e.g. `PROJ-7`). Blank means no restriction.
+          schema:
+            type: string
+            maxLength: 200
+          example: login
+        - name: page
+          in: query
+          required: false
+          description: 1-based page number. A page past the end returns an empty list (ISS-13).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+      responses:
+        '200':
+          description: |
+            Full list page, or only the list fragment when `HX-Request: true`
+            (ISS-14). The rendered page contains the items described by
+            `IssueListPage`.
+          content:
+            text/html:
+              schema:
+                type: string
+                contentMediaType: text/html
+                x-view-model:
+                  $ref: '#/components/schemas/IssueListPage'
+              example: |
+                <table id="issue-list">
+                  <tr><td><a href="/projects/PROJ/issues/7">PROJ-7</a></td><td>Login fails</td><td>BUG</td><td>HIGH</td><td>To Do</td><td>Alice</td></tr>
+                </table>
+        '302':
+          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/HtmxUnauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Invalid `status`, `type`, `assignee` or `page`. No list is returned.
+          content:
+            text/html:
+              schema:
+                type: string
+                x-view-model:
+                  $ref: '#/components/schemas/ValidationErrors'
+
+    post:
+      tags: [Issues]
+      operationId: createIssue
+      summary: Create an issue
+      description: |
+        Creates an issue with status `TO_DO`, the current user as reporter, and
+        the next number in the project (ISS-1). Concurrent creates receive
+        distinct consecutive numbers (ISS-5). A rejected create consumes no
+        number (ISS-3). An unknown project returns `404` before validation.
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/CreateIssueForm'
+            example:
+              title: Login fails with uppercase username
+              description: Steps to reproduce...
+              type: BUG
+              priority: HIGH
+              assignee: '42'
+              _csrf: 3f1c9e2a-...
+      responses:
+        '302':
+          description: Created. Redirects to the new issue's detail page.
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+                format: uri-reference
+              example: /projects/PROJ/issues/8
+        '401':
+          $ref: '#/components/responses/HtmxUnauthenticated'
+        '403':
+          description: Missing or invalid CSRF token. Nothing is created.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: |
+            Validation failed (ISS-3, ISS-4). The create form is re-rendered
+            with field errors and the submitted values; nothing is created.
+          content:
+            text/html:
+              schema:
+                type: string
+                x-view-model:
+                  $ref: '#/components/schemas/ValidationErrors'
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: JSESSIONID
+      description: Server session created by form login at `POST /login`.
+
+  parameters:
+    ProjectKey:
+      name: projectKey
+      in: path
+      required: true
+      description: Project key.
+      schema:
+        type: string
+        pattern: '^[A-Z]{2,10}$'
+      example: PROJ
+    HxRequest:
+      name: HX-Request
+      in: header
+      required: false
+      description: Sent by htmx. When `true`, the response is a fragment instead of a full page.
+      schema:
+        type: string
+        enum: ['true']
+    CsrfHeader:
+      name: X-CSRF-TOKEN
+      in: header
+      required: false
+      description: CSRF token sent by htmx. Plain form posts send `_csrf` in the body instead. One of the two is required.
+      schema:
+        type: string
+
+  responses:
+    LoginRedirect:
+      description: Not logged in (normal browser request). Redirects to the login page; no data is returned.
+      headers:
+        Location:
+          required: true
+          schema:
+            type: string
+          example: /login
+    HtmxUnauthenticated:
+      description: Not logged in (htmx request). No data is returned; htmx navigates to the login page.
+      headers:
+        HX-Redirect:
+          required: true
+          schema:
+            type: string
+            const: /login
+    NotFound:
+      description: Unknown project key. Nothing is disclosed about other projects.
+      content:
+        text/html:
+          schema:
+            type: string
+
+  schemas:
+    IssueType:
+      type: string
+      enum: [TASK, BUG, STORY]
+    IssuePriority:
+      type: string
+      enum: [LOW, MEDIUM, HIGH]
+    IssueStatus:
+      type: string
+      enum: [TO_DO, IN_PROGRESS, DONE]
+
+    CreateIssueForm:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: Trimmed before validation; blank is rejected.
+        description:
+          type: string
+          maxLength: 5000
+          description: Plain text, HTML-escaped when shown.
+        type:
+          $ref: '#/components/schemas/IssueType'
+          default: TASK
+        priority:
+          $ref: '#/components/schemas/IssuePriority'
+          default: MEDIUM
+        assignee:
+          description: Existing user id. Empty or `none` means unassigned.
+          type: string
+          pattern: '^([0-9]+|none)?$'
+        _csrf:
+          type: string
+          description: CSRF token for plain form posts.
+      additionalProperties: false
+
+    IssueSummary:
+      type: object
+      description: One row of the issue list.
+      required: [key, number, title, type, priority, status]
+      properties:
+        key:
+          type: string
+          example: PROJ-7
+        number:
+          type: integer
+          minimum: 1
+        title:
+          type: string
+        type:
+          $ref: '#/components/schemas/IssueType'
+        priority:
+          $ref: '#/components/schemas/IssuePriority'
+        status:
+          $ref: '#/components/schemas/IssueStatus'
+        assignee:
+          type: [string, 'null']
+          description: Assignee display name, or null when unassigned.
+
+    IssueListPage:
+      type: object
+      description: Data rendered by the list page (documentation of the HTML content).
+      required: [items, page, pageSize, hasNext]
+      properties:
+        items:
+          type: array
+          maxItems: 25
+          items:
+            $ref: '#/components/schemas/IssueSummary'
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          const: 25
+        hasNext:
+          type: boolean
+
+    ValidationErrors:
+      type: object
+      description: Field errors rendered next to the form fields or filters.
+      required: [errors]
+      properties:
+        errors:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+                example: title
+              message:
+                type: string
+                example: Title is required
