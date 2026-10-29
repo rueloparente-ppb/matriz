@@ -2,6 +2,8 @@ package com.jiraclone.sprints.web;
 
 import com.jiraclone.common.NotFoundException;
 import com.jiraclone.identity.IdentityApi;
+import com.jiraclone.issues.IssueRef;
+import com.jiraclone.issues.IssuesApi;
 import com.jiraclone.projects.ProjectRef;
 import com.jiraclone.projects.ProjectsApi;
 import com.jiraclone.sprints.core.SprintService;
@@ -21,11 +23,13 @@ class SprintController {
 	private final ProjectsApi projects;
 	private final SprintService sprints;
 	private final IdentityApi identity;
+	private final IssuesApi issues;
 
-	SprintController(ProjectsApi projects, SprintService sprints, IdentityApi identity) {
+	SprintController(ProjectsApi projects, SprintService sprints, IdentityApi identity, IssuesApi issues) {
 		this.projects = projects;
 		this.sprints = sprints;
 		this.identity = identity;
+		this.issues = issues;
 	}
 
 	@ModelAttribute("project")
@@ -66,6 +70,43 @@ class SprintController {
 		if (!sprints.complete(project.id(), id, identity.currentUser().orElseThrow().id()))
 			return error(project, model, hx, HttpStatus.CONFLICT, "Cannot complete sprint");
 		return success(project, hx, model);
+	}
+
+	@GetMapping("/projects/{key}/issues/{number}/sprint")
+	String picker(@ModelAttribute("project") ProjectRef project, @PathVariable int number, Model model) {
+		populatePicker(project, number, model);
+		return "sprints/picker :: picker";
+	}
+
+	@PostMapping("/projects/{key}/issues/{number}/sprint")
+	Object assign(@ModelAttribute("project") ProjectRef project, @PathVariable int number,
+			@RequestParam(defaultValue = "") String sprint,
+			@RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
+		issue(project, number);
+		try {
+			sprints.assign(project.id(), number, sprint, identity.currentUser().orElseThrow().id());
+		} catch (IllegalArgumentException ex) {
+			populatePicker(project, number, model);
+			model.addAttribute("error", ex.getMessage());
+			return new ModelAndView("sprints/picker :: picker", HttpStatus.UNPROCESSABLE_ENTITY);
+		}
+		if (!"true".equalsIgnoreCase(hx))
+			return "redirect:/projects/" + project.key() + "/issues/" + number;
+		populatePicker(project, number, model);
+		return "sprints/picker :: picker";
+	}
+
+	private IssueRef issue(ProjectRef project, int number) {
+		return issues.findIssue(project.id(), number).orElseThrow(() -> new NotFoundException("Issue " + number));
+	}
+
+	private void populatePicker(ProjectRef project, int number, Model model) {
+		IssueRef issue = issue(project, number);
+		model.addAttribute("number", number);
+		model.addAttribute("currentSprint", sprints.currentId(issue.id()));
+		model.addAttribute("currentName", sprints.currentName(project.id(), issue.id()));
+		model.addAttribute("availableSprints", sprints.list(project.id()).stream()
+				.filter(s -> !s.state().equals("COMPLETED")).toList());
 	}
 
 	private Object success(ProjectRef project, String hx, Model model) {

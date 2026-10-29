@@ -191,6 +191,77 @@ class SprintsTests extends AbstractIntegrationTest {
 	}
 
 	@Test
+	void spr9_to_spr14_assignmentValidationNoOpAndHistory() throws Exception {
+		String key = project(), other = project();
+		create(key, "One"); create(key, "Two"); create(key, "Closed"); create(other, "Foreign");
+		long one = id(key, "One"), two = id(key, "Two"), closed = id(key, "Closed"), foreign = id(other, "Foreign");
+		mvc.perform(post("/projects/" + key + "/issues").with(user("alice")).with(csrf())
+				.param("title", "Assigned")).andExpect(status().isFound());
+		long issue = jdbc.queryForObject("select i.id from issue i join project p on p.id=i.project_id where p.key=?", Long.class, key);
+		String endpoint = "/projects/" + key + "/issues/1/sprint";
+		mvc.perform(get(endpoint).with(user("alice"))).andExpect(status().isOk())
+				.andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("One", "Two", "None", "name=\"_csrf\""));
+		mvc.perform(post(endpoint).with(user("alice")).with(csrf()).param("sprint", String.valueOf(one)))
+				.andExpect(status().isFound());
+		assertThat(jdbc.queryForObject("select sprint_id from sprint_issue where issue_id=?", Long.class, issue)).isEqualTo(one);
+		var timestamp = jdbc.queryForObject("select updated_at from issue where id=?", java.time.OffsetDateTime.class, issue);
+		mvc.perform(post(endpoint).with(user("bob")).with(csrf()).param("sprint", String.valueOf(one)))
+				.andExpect(status().isFound());
+		assertThat(jdbc.queryForObject("select updated_at from issue where id=?", java.time.OffsetDateTime.class, issue)).isEqualTo(timestamp);
+		assertThat(action(key, closed, "start")).isEqualTo(302);
+		assertThat(action(key, closed, "complete")).isEqualTo(302);
+		for (String invalid : List.of(String.valueOf(closed), "garbage", "0")) {
+			mvc.perform(post(endpoint).with(user("bob")).with(csrf()).param("sprint", invalid))
+					.andExpect(status().isUnprocessableEntity());
+		}
+		mvc.perform(post(endpoint).with(user("bob")).with(csrf()).param("sprint", String.valueOf(foreign)))
+				.andExpect(status().isNotFound());
+		mvc.perform(post(endpoint).with(user("bob")).with(csrf()).param("sprint", String.valueOf(two))
+				.header("HX-Request", "true")).andExpect(status().isOk())
+				.andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("id=\"issue-sprint\""));
+		assertThat(jdbc.queryForList("select sprint_id from sprint_issue where issue_id=?", Long.class, issue)).containsExactly(two);
+		mvc.perform(post(endpoint).with(user("bob")).with(csrf()).param("sprint", ""))
+				.andExpect(status().isFound());
+		assertThat(jdbc.queryForList("select sprint_id from sprint_issue where issue_id=?", Long.class, issue)).isEmpty();
+		assertThat(jdbc.queryForList("select old_value || ':' || new_value from issue_history "
+				+ "where issue_id=? and kind='SPRINT_CHANGED' order by id", String.class, issue))
+				.containsExactly("None:One", "One:Two", "Two:None");
+		mvc.perform(post(endpoint).with(user("alice")).param("sprint", String.valueOf(one)))
+				.andExpect(status().isForbidden());
+		mvc.perform(get(endpoint)).andExpect(status().isFound());
+	}
+
+	@Test
+	void spr15_spr16_boardFilterAndFilteredMove() throws Exception {
+		String key = project(), other = project();
+		create(key, "Selected"); create(other, "Foreign");
+		long selected = id(key, "Selected"), foreign = id(other, "Foreign");
+		for (String title : List.of("In sprint", "No sprint"))
+			mvc.perform(post("/projects/" + key + "/issues").with(user("alice")).with(csrf())
+					.param("title", title)).andExpect(status().isFound());
+		mvc.perform(post("/projects/" + key + "/issues/1/sprint").with(user("alice")).with(csrf())
+				.param("sprint", String.valueOf(selected))).andExpect(status().isFound());
+		String board = "/projects/" + key + "/board";
+		assertThat(mvc.perform(get(board).with(user("alice"))).andReturn().getResponse().getContentAsString())
+				.contains("In sprint", "No sprint");
+		assertThat(mvc.perform(get(board).with(user("alice")).param("sprint", String.valueOf(selected)))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
+				.contains("<span>In sprint</span>", "selected=\"selected\"").doesNotContain("<span>No sprint</span>");
+		assertThat(mvc.perform(get(board).with(user("alice")).param("sprint", "none"))
+				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString())
+				.contains("<span>No sprint</span>").doesNotContain("<span>In sprint</span>");
+		mvc.perform(get(board).with(user("alice")).param("sprint", "nonsense"))
+				.andExpect(status().isUnprocessableEntity())
+				.andExpect(result -> assertThat(result.getResponse().getContentAsString()).doesNotContain("<span>No sprint</span>", "<span>In sprint</span>"));
+		mvc.perform(get(board).with(user("alice")).param("sprint", String.valueOf(foreign)))
+				.andExpect(status().isNotFound());
+		mvc.perform(post(board + "/move").with(user("bob")).with(csrf()).header("HX-Request", "true")
+				.param("issue", "1").param("status", "DONE").param("sprint", String.valueOf(selected)))
+				.andExpect(status().isOk()).andExpect(result -> assertThat(result.getResponse().getContentAsString())
+						.contains("<span>In sprint</span>", "selected=\"selected\"").doesNotContain("<span>No sprint</span>", "<html"));
+	}
+
+	@Test
 	void spr18_authenticationAndCsrfApplyToPageAndMutations() throws Exception {
 		String key = project(); create(key, "Hidden"); long sprint = id(key, "Hidden");
 		for (var request : List.of(get(url(key)), post(url(key)).with(csrf()).param("name", "Secret"),
