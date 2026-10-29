@@ -1,0 +1,20 @@
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Build output
+target/
+build/
+out/
+.gradle/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Environment / secrets
+.env
+.env.*
