@@ -24,7 +24,7 @@ This is the data model for the Jira clone MVP. It is derived from the specs in [
 | `id` | `bigint` identity | no | PK |
 | `username` | `varchar(50)` | no | Unique case-insensitively (`UNIQUE (lower(username))`) — AUTH-8 |
 | `display_name` | `varchar(100)` | no | Shown in pickers, comments, history |
-| `password_hash` | `varchar(100)` | no | bcrypt; never plain text — AUTH-7 |
+| `password_hash` | `varchar(100)` | no | bcrypt; never plain text — AUTH-7. Becomes nullable if an external IdP is adopted (architecture §7) |
 
 ### `project`
 
