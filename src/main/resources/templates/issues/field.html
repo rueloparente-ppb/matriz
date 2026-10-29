@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div class="issue-field mb-2" th:fragment="view(field)" th:id="|issue-${field}|">
+  <strong class="text-capitalize" th:if="${field == 'title' or field == 'description'}" th:text="${field}">Field</strong>
+  <span style="white-space: pre-wrap" th:text="${field == 'assignee' ? issue.assigneeName : issue[field]}">Value</span>
+  <button type="button" class="btn btn-link btn-sm" th:hx-get="@{/projects/{key}/issues/{number}/{field}/edit(key=${project.key},number=${issue.number},field=${field})}"
+          hx-target="closest .issue-field" hx-swap="outerHTML" th:aria-label="|Edit ${field}|">Edit</button>
+</div>
+<div class="issue-field mb-2" th:fragment="edit" th:id="|issue-${field}|">
+  <form method="post" th:action="@{/projects/{key}/issues/{number}/{field}(key=${project.key},number=${issue.number},field=${field})}"
+        hx-target="closest .issue-field" hx-swap="outerHTML" th:hx-post="@{/projects/{key}/issues/{number}/{field}(key=${project.key},number=${issue.number},field=${field})}">
+    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    <label class="text-capitalize" th:for="|edit-${field}|" th:text="${field}">Field</label>
+    <textarea th:if="${field == 'description'}" name="value" th:id="|edit-${field}|" th:text="${value}" class="form-control"></textarea>
+    <input th:if="${field == 'title'}" name="value" th:id="|edit-${field}|" th:value="${value}" class="form-control">
+    <select th:if="${field == 'type'}" name="value" th:id="|edit-${field}|" class="form-select">
+      <option th:each="option : ${T(com.jiraclone.issues.IssueType).values()}" th:value="${option}" th:text="${option}" th:selected="${value == option.name()}"></option>
+    </select>
+    <select th:if="${field == 'priority'}" name="value" th:id="|edit-${field}|" class="form-select">
+      <option th:each="option : ${T(com.jiraclone.issues.IssuePriority).values()}" th:value="${option}" th:text="${option}" th:selected="${value == option.name()}"></option>
+    </select>
+    <select th:if="${field == 'status'}" name="value" th:id="|edit-${field}|" class="form-select">
+      <option th:each="option : ${T(com.jiraclone.issues.IssueStatus).values()}" th:value="${option}" th:text="${option}" th:selected="${value == option.name()}"></option>
+    </select>
+    <select th:if="${field == 'assignee'}" name="value" th:id="|edit-${field}|" class="form-select">
+      <option value="none" th:selected="${value == 'none' or value == ''}">Unassigned</option>
+      <option th:each="person : ${users}" th:value="${person.id}" th:text="${person.displayName}" th:selected="${value == person.id.toString()}"></option>
+    </select>
+    <div class="text-danger" th:if="${error != null}" th:text="${error}">Error</div>
+    <button type="submit" class="btn btn-primary btn-sm mt-1">Save</button>
+    <button type="button" class="btn btn-link btn-sm" th:hx-get="@{/projects/{key}/issues/{number}/{field}(key=${project.key},number=${issue.number},field=${field})}"
+            hx-target="closest .issue-field" hx-swap="outerHTML">Cancel</button>
+  </form>
+</div>
+</body>
+</html>

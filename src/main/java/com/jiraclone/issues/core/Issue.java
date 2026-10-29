@@ -123,4 +123,16 @@ class Issue {
 	Instant getUpdatedAt() {
 		return updatedAt;
 	}
+
+	void setTitle(String title) { this.title = title; }
+	void setDescription(String description) { this.description = description; }
+	void setType(IssueType type) { this.type = type; }
+	void setPriority(IssuePriority priority) { this.priority = priority; }
+	void setStatus(IssueStatus status) { this.status = status; }
+	void setAssigneeId(Long assigneeId) { this.assigneeId = assigneeId; }
+
+	void touch() {
+		Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);
+		updatedAt = now.isAfter(updatedAt) ? now : updatedAt.plus(1, ChronoUnit.MICROS);
+	}
 }
