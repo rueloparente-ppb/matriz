@@ -49,12 +49,12 @@ Budget: ~300 production lines per PR (the user's budget, which replaces the skil
 **Estimated source lines:** not counted
 **Requirements:** Foundation — no spec requirement
 
-- [ ] 1.1 Maven project (wrapper, Java 25, Spring Boot web, Thymeleaf, Security, Data JPA, Validation, Flyway, PostgreSQL driver, Testcontainers). Check: `./mvnw verify` succeeds.
-- [ ] 1.2 `docker-compose.yml` with PostgreSQL and matching `application` config. Check: `docker compose up -d` then the app starts and Flyway reports an empty schema history.
-- [ ] 1.3 Base Thymeleaf layout loading Bootstrap 5, htmx and SortableJS from CDN, with a navbar slot. Check: rendering test sees the three asset tags.
-- [ ] 1.4 Shared Testcontainers integration test base (Postgres container, MockMvc). Check: context-load test passes.
-- [ ] 1.5 CI workflow running `./mvnw verify`. **Open question:** which CI (GitHub Actions or GitLab CI)? Check: pipeline green on the PR.
-- [ ] 1.6 README: prerequisites, `docker compose up`, run command. Check: steps reproduced on a clean checkout.
+- [x] 1.1 Maven project (wrapper, Java 25, Spring Boot web, Thymeleaf, Security, Data JPA, Validation, Flyway, PostgreSQL driver, Testcontainers). Check: `./mvnw verify` succeeds.
+- [x] 1.2 `docker-compose.yml` with PostgreSQL and matching `application` config. Check: `docker compose up -d` then the app starts and Flyway reports an empty schema history.
+- [x] 1.3 Base Thymeleaf layout loading Bootstrap 5, htmx and SortableJS from CDN, with a navbar slot. Check: rendering test sees the three asset tags.
+- [x] 1.4 Shared Testcontainers integration test base (Postgres container, MockMvc). Check: context-load test passes.
+- [x] 1.5 CI workflow running `./mvnw verify`. **Open question:** which CI (GitHub Actions or GitLab CI)? Check: pipeline green on the PR.
+- [x] 1.6 README: prerequisites, `docker compose up`, run command. Check: steps reproduced on a clean checkout.
 
 ### 2. User persistence and seeded users
 
@@ -64,10 +64,10 @@ Budget: ~300 production lines per PR (the user's budget, which replaces the skil
 **Estimated source lines:** ~80–110
 **Requirements:** AUTH-7, AUTH-8 (lookup part), AUTH-9
 
-- [ ] 2.1 Flyway migration for users (unique index on lower(username), display name, password hash). Check: migration test inserts two usernames differing only by case and expects a unique violation.
-- [ ] 2.2 Seed migration with a few users and bcrypt hashes; document seeded credentials in the README. Check: test reads seeded users and asserts stored hash ≠ plain password and matches with bcrypt.
-- [ ] 2.3 User entity, repository with case-insensitive lookup, and a user-details service. Check: test finds `ALICE` when stored as `alice`.
-- [ ] 2.4 Public `IdentityApi` (current user, find user, list users) returning the `UserRef` record (id, username, displayName); entity, `UserDetails` and password hash stay in `identity/core`. The current-user lookup reads the Spring Security principal only inside `identity`. Check: unit test that `currentUser()` returns a `UserRef`; architecture test for AUTH-9 (no other module imports `org.springframework.security` user types or `identity.core`).
+- [x] 2.1 Flyway migration for users (unique index on lower(username), display name, password hash). Check: migration test inserts two usernames differing only by case and expects a unique violation.
+- [x] 2.2 Seed migration with a few users and bcrypt hashes; document seeded credentials in the README. Check: test reads seeded users and asserts stored hash ≠ plain password and matches with bcrypt.
+- [x] 2.3 User entity, repository with case-insensitive lookup, and a user-details service. Check: test finds `ALICE` when stored as `alice`.
+- [x] 2.4 Public `IdentityApi` (current user, find user, list users) returning the `UserRef` record (id, username, displayName); entity, `UserDetails` and password hash stay in `identity/core`. The current-user lookup reads the Spring Security principal only inside `identity`. Check: unit test that `currentUser()` returns a `UserRef`; architecture test for AUTH-9 (no other module imports `org.springframework.security` user types or `identity.core`).
 
 ### 3. Form login, logout, CSRF and htmx handling
 
@@ -77,11 +77,11 @@ Budget: ~300 production lines per PR (the user's budget, which replaces the skil
 **Estimated source lines:** ~120–170
 **Requirements:** AUTH-1, AUTH-2, AUTH-3, AUTH-4, AUTH-5, AUTH-6, AUTH-8
 
-- [ ] 3.1 Security configuration: form login at `/login`, failure URL `/login?error`, logout `POST /logout` → `/login?logout`, saved-request redirect, bcrypt encoder. Check: tests for AUTH-1, AUTH-2 (wrong password and unknown user give identical responses), AUTH-5.
-- [ ] 3.2 Authentication entry point: `HX-Request: true` → `401` with `HX-Redirect: /login`, otherwise `302` to `/login`; no body content. Check: tests for AUTH-3, AUTH-4.
-- [ ] 3.3 CSRF token exposed in the layout and sent by htmx on every request (`hx-headers`). Check: test that a POST without a token returns `403` and changes nothing (AUTH-6); manual check that an htmx POST succeeds.
-- [ ] 3.4 Login page template, navbar logout button and display name, `GET /` → `/projects`. Check: test that `/` redirects; manual check of the login page.
-- [ ] 3.5 Restart persistence. Check: test that logs in with a seeded user against a fresh context (AUTH-7).
+- [x] 3.1 Security configuration: form login at `/login`, failure URL `/login?error`, logout `POST /logout` → `/login?logout`, saved-request redirect, bcrypt encoder. Check: tests for AUTH-1, AUTH-2 (wrong password and unknown user give identical responses), AUTH-5.
+- [x] 3.2 Authentication entry point: `HX-Request: true` → `401` with `HX-Redirect: /login`, otherwise `302` to `/login`; no body content. Check: tests for AUTH-3, AUTH-4.
+- [x] 3.3 CSRF token exposed in the layout and sent by htmx on every request (`hx-headers`). Check: test that a POST without a token returns `403` and changes nothing (AUTH-6); manual check that an htmx POST succeeds.
+- [x] 3.4 Login page template, navbar logout button and display name, `GET /` → `/projects`. Check: test that `/` redirects; manual check of the login page.
+- [x] 3.5 Restart persistence. Check: test that logs in with a seeded user against a fresh context (AUTH-7).
 
 ## Coverage and ordering
 

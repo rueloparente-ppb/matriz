@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::title}, ~{::main})}">
+<head><title>Projects</title></head>
+<body>
+<main class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 m-0">Projects</h1>
+    <a class="btn btn-primary" th:href="@{/projects/new}">New project</a>
+  </div>
+  <p th:if="${#lists.isEmpty(projects)}" class="text-muted">No projects yet.</p>
+  <table class="table" th:unless="${#lists.isEmpty(projects)}">
+    <thead><tr><th>Key</th><th>Name</th></tr></thead>
+    <tbody>
+      <tr th:each="p : ${projects}">
+        <td><a th:href="@{/projects/{key}(key=${p.key})}" th:text="${p.key}">PROJ</a></td>
+        <td th:text="${p.name}">Name</td>
+      </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

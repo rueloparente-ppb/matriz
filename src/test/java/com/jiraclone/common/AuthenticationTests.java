@@ -83,8 +83,8 @@ class AuthenticationTests extends AbstractIntegrationTest {
 	@Test
 	void auth5_logoutInvalidatesSession() throws Exception {
 		MockHttpSession session = login("alice", "password");
-		// authenticated: the request passes security (404 as /projects does not exist yet, not a redirect to login)
-		mvc.perform(get("/projects").session(session)).andExpect(status().isNotFound());
+		// authenticated: the request passes security
+		mvc.perform(get("/projects").session(session)).andExpect(status().isOk());
 
 		mvc.perform(post("/logout").with(csrf()).session(session))
 				.andExpect(status().isFound())
@@ -103,7 +103,7 @@ class AuthenticationTests extends AbstractIntegrationTest {
 		mvc.perform(post("/login").param("username", "alice").param("password", "password"))
 				.andExpect(status().isForbidden());
 
-		mvc.perform(get("/projects").session(session)).andExpect(status().isNotFound());
+		mvc.perform(get("/projects").session(session)).andExpect(status().isOk());
 	}
 
 	@Test
