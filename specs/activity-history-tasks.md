@@ -5,7 +5,7 @@
 
 ## Overview
 
-An append-only per-issue log, written in the same transaction as the change by hooking into the issue create path and the shared single-field update path (issues groups 2 and 5). The board inherits it because it reuses that path. Sprint entries (`SPRINT_CHANGED`) are written by [sprints-tasks.md](sprints-tasks.md) using the recorder built here. This is MR 8 in the global stack.
+An append-only per-issue log. The `history` module listens synchronously (`@EventListener`) to `IssueCreated` and `IssueFieldChanged` (published by issues group 5) and to `IssueSprintChanged` (published by sprints groups 2–3). Because the listener runs in the publisher's transaction, a change and its entry commit together (architecture AD-2). The board inherits this because it goes through `IssuesApi`. This is MR 8 in the global stack.
 
 **Estimated size:** ~210–310 source lines — single PR (base: comments PR)
 
@@ -21,7 +21,7 @@ An append-only per-issue log, written in the same transaction as the change by h
 **Requirements:** HST-13 (and the atomicity rule)
 
 - [ ] 1.1 Flyway migration: issue_history (issue FK, actor FK, kind, field, old_value text, new_value text, created_at, identity id). Check: migration applies.
-- [ ] 1.2 Recorder that requires an existing transaction and takes display values (assignee display name, "None" for empty). Check: test that calling it outside a transaction fails.
+- [ ] 1.2 Recorder service that requires an existing transaction (`Propagation.MANDATORY`) and stores the display values it is given. Check: test that calling it outside a transaction fails.
 - [ ] 1.3 No update or delete endpoints exist. Check: entries are present after a context restart (HST-13).
 
 ### 2. Record changes
@@ -31,8 +31,8 @@ An append-only per-issue log, written in the same transaction as the change by h
 **Estimated source lines:** ~50–90
 **Requirements:** HST-1, HST-2, HST-3, HST-4, HST-5, HST-6, HST-10, BRD-9
 
-- [ ] 2.1 Call the recorder from the create path and from the update path only when the value changed. Check: tests for HST-1, HST-2, HST-4, HST-5.
-- [ ] 2.2 Assignee values as display names, "None" when empty. Check: tests for assign, reassign and clear (HST-6).
+- [ ] 2.1 Synchronous `@EventListener`s for `IssueCreated` and `IssueFieldChanged` that call the recorder. Check: tests for HST-1, HST-2, HST-4, HST-5 (no-op and `422` publish nothing, so nothing is written).
+- [ ] 2.2 Assignee values as display names, "None" when empty (resolved by the publisher into the event). Check: tests for assign, reassign and clear (HST-6).
 - [ ] 2.3 Board move. Check: test that a move writes the same `status` entry as an edit (HST-3, BRD-9).
 - [ ] 2.4 Atomicity. Check: test forcing a recorder failure rolls back the field change.
 - [ ] 2.5 Comments. Check: test that adding a comment writes no entry (HST-10).
@@ -55,6 +55,6 @@ An append-only per-issue log, written in the same transaction as the change by h
 | HST-13 | 1 |
 | HST-1, HST-2, HST-3, HST-4, HST-5, HST-6, HST-10, BRD-9 | 2 |
 | HST-7, HST-8, HST-9, HST-11, HST-12, HST-14 | 3 |
-| `SPRINT_CHANGED` entries | sprints groups 2–3 (using the recorder from group 1) |
+| `SPRINT_CHANGED` entries | listener for `IssueSprintChanged` added with sprints group 2 |
 
 The groups run in order 1 → 2 → 3. Every dependency is in an earlier PR.
