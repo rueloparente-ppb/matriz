@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: jira-clone
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/jiraclone}
+    username: ${DB_USERNAME:jiraclone}
+    password: ${DB_PASSWORD:jiraclone}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
