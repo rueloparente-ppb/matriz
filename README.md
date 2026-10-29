@@ -16,6 +16,10 @@ docker compose up -d postgres      # PostgreSQL on localhost:5432
 
 DB settings default to the compose values; override with `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`.
 
+## Seeded users
+
+Every page except `/login` requires a login. Development users (seeded by Flyway): `alice`, `bob`, `carol`, all with password `password`. Usernames are case-insensitive. These are for local use only.
+
 ## Test
 
 ```sh

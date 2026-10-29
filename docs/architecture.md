@@ -173,11 +173,27 @@ sequenceDiagram
 | AD-8 | Sessions in memory; no Spring Session table | Local-only MVP; restart logs users out, which no spec forbids |
 | AD-9 | Concurrency rules (unique project key, one active sprint, issue numbering) are enforced by database constraints and mapped to `422`/`409` | Correct under concurrent requests without application locks |
 
-## 7. Testing strategy
+## 7. Future identity provider (Keycloak/OIDC)
+
+Not part of the MVP. The design keeps the swap small:
+
+- Only `identity` and `common`'s security configuration know how users authenticate. Other modules call `IdentityApi` and receive a `UserRef` (AUTH-9), never `UserDetails` or the entity.
+- `app_user` is a local projection of a person. Other tables keep FKs to `app_user.id`, so they do not change when an IdP is adopted.
+- The htmx `401` + `HX-Redirect` entry point and CSRF handling stay as they are.
+
+Expected migration (about 1–2 PRs, other modules untouched):
+
+1. Flyway: add nullable unique `app_user.external_id` (OIDC `sub`) and make `password_hash` nullable.
+2. Replace form login with the OIDC client (authorization code + PKCE), add find-or-create by `sub` on first login to `IdentityApi`, and RP-initiated logout.
+3. Add Keycloak and a realm export (no secrets) to docker-compose; rewrite AUTH-1, 2, 7, 8 in the spec.
+
+Known consequence: users who have never logged in do not exist locally, so they cannot be assigned until provisioned.
+
+## 8. Testing strategy
 
 | Level | Tooling | Scope |
 | --- | --- | --- |
-| Architecture | `ApplicationModules.of(JiraCloneApplication.class).verify()` | Module boundaries and acyclic dependencies |
+| Architecture | `ApplicationModules.of(JiraCloneApplication.class).verify()`, plus an ArchUnit-style test for AUTH-9 | Module boundaries, acyclic dependencies, no Spring Security user types outside `identity`/`common` |
 | Module integration | `@ApplicationModuleTest` or `@SpringBootTest` + Testcontainers Postgres | Services, constraints, event listener atomicity |
 | Web | MockMvc with security and CSRF enabled | Status codes, fragments vs full pages, `HX-*` headers, escaping |
 | Concurrency | Parallel requests against Testcontainers | PRJ-6, ISS-5, SPR-5 |
