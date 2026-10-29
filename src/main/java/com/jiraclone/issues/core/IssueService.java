@@ -2,15 +2,18 @@ package com.jiraclone.issues.core;
 
 import com.jiraclone.issues.IssuePriority;
 import com.jiraclone.issues.IssueType;
-import java.util.List;
 import java.util.Optional;
 import java.util.OptionalLong;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
 public class IssueService {
+
+	public static final int PAGE_SIZE = 25;
 
 	private final IssueRepository issues;
 	private final IssueNumbering numbering;
@@ -38,9 +41,12 @@ public class IssueService {
 		return issues.findByProjectIdAndNumber(projectId, number).map(IssueService::toDetail);
 	}
 
-	/** All issues of a project, number descending. */
-	public List<IssueDetail> list(long projectId) {
-		return issues.findByProjectIdOrderByNumberDesc(projectId).stream().map(IssueService::toDetail).toList();
+	/** One page of a project's issues, number descending, {@value #PAGE_SIZE} per page; {@code page} is 1-based. */
+	public IssuePage list(long projectId, String projectKey, IssueFilter filter, int page) {
+		var pageable = PageRequest.of(page - 1, PAGE_SIZE, Sort.by(Sort.Direction.DESC, "number"));
+		var result = issues.findAll(IssueSpecs.matching(projectId, projectKey, filter), pageable);
+		return new IssuePage(result.map(IssueService::toDetail).getContent(), page, result.getTotalPages(),
+				result.getTotalElements());
 	}
 
 	private static IssueDetail toDetail(Issue i) {

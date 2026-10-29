@@ -27,11 +27,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.PostMapping;
 
 @Controller
 class IssueController {
 
+	private static final String LIST_VIEW = "issues/list";
 	private static final String FORM_VIEW = "issues/new";
 	private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 			.withZone(ZoneId.systemDefault());
@@ -58,10 +60,26 @@ class IssueController {
 	}
 
 	@GetMapping("/projects/{key}/issues")
-	String list(@ModelAttribute("project") ProjectRef project, Model model) {
+	Object list(@ModelAttribute("project") ProjectRef project, IssueListQuery query,
+			@RequestHeader(value = "HX-Request", required = false) String hxRequest,
+			@RequestHeader(value = "HX-History-Restore-Request", required = false) String historyRestore,
+			Model model) {
+		// A history restore after a cache miss needs the full page, not the fragment.
+		boolean fragment = "true".equalsIgnoreCase(hxRequest) && !"true".equalsIgnoreCase(historyRestore);
+		String view = fragment ? LIST_VIEW + " :: results" : LIST_VIEW;
+		var parsed = query.parse(identity);
+		model.addAttribute("query", query);
+		model.addAttribute("users", identity.listUsers());
+		model.addAttribute("errors", parsed.errors());
+		if (!parsed.valid()) {
+			return ErrorViews.unprocessable(view);
+		}
+		var result = issues.list(project.id(), project.key(), parsed.filter(), parsed.page());
 		Map<Long, UserRef> users = userIndex();
-		model.addAttribute("issues", issues.list(project.id()).stream().map(i -> toView(project, i, users)).toList());
-		return "issues/list";
+		model.addAttribute("issues", result.items().stream().map(i -> toView(project, i, users)).toList());
+		model.addAttribute("page", result.page());
+		model.addAttribute("totalPages", result.totalPages());
+		return view;
 	}
 
 	@GetMapping("/projects/{key}/issues/new")

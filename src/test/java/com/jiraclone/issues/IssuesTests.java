@@ -2,6 +2,7 @@ package com.jiraclone.issues;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
@@ -228,5 +229,99 @@ class IssuesTests extends AbstractIntegrationTest {
 					.andExpect(header().string("HX-Redirect", "/login")).andExpect(content().string(""));
 		}
 		assertThat(issueCount(key)).isEqualTo(1);
+	}
+
+	private ResultActions list(String key, String... params) throws Exception {
+		var request = get("/projects/" + key + "/issues").with(user("alice"));
+		for (int i = 0; i < params.length; i += 2) {
+			request.param(params[i], params[i + 1]);
+		}
+		return mvc.perform(request);
+	}
+
+	@Test
+	void iss9_listIsScopedToProjectAndNewestFirst() throws Exception {
+		String key = newProject();
+		String other = newProject();
+		create("alice", key, "Older").andExpect(status().isFound());
+		create("alice", key, "Newer").andExpect(status().isFound());
+		create("alice", other, "Foreign").andExpect(status().isFound());
+		list(key).andExpect(status().isOk()).andExpect(content().string(not(containsString("Foreign"))))
+				.andExpect(content().string(matchesPattern("(?s).*Newer.*Older.*")));
+	}
+
+	@Test
+	void iss10_filtersCombineWithAnd() throws Exception {
+		String key = newProject();
+		long bob = userId("bob");
+		mvc.perform(createRequest("alice", key, "Bug for bob").param("type", "BUG").param("assigneeId", "" + bob));
+		mvc.perform(createRequest("alice", key, "Bug nobody").param("type", "BUG"));
+		mvc.perform(createRequest("alice", key, "Task for bob").param("assigneeId", "" + bob));
+		jdbc.update("update issue set status = 'DONE' where title = 'Task for bob'");
+
+		list(key, "type", "BUG").andExpect(content().string(containsString("Bug for bob")))
+				.andExpect(content().string(containsString("Bug nobody")))
+				.andExpect(content().string(not(containsString("Task for bob"))));
+		list(key, "assignee", "none").andExpect(content().string(containsString("Bug nobody")))
+				.andExpect(content().string(not(containsString("Bug for bob"))));
+		list(key, "type", "BUG", "assignee", "" + bob).andExpect(content().string(containsString("Bug for bob")))
+				.andExpect(content().string(not(containsString("Bug nobody"))))
+				.andExpect(content().string(not(containsString("Task for bob"))));
+		list(key, "status", "DONE", "type", "BUG").andExpect(content().string(not(containsString("Bug for bob"))))
+				.andExpect(content().string(containsString("No issues found")));
+		list(key, "status", "DONE").andExpect(content().string(containsString("Task for bob")))
+				.andExpect(content().string(not(containsString("Bug for bob"))));
+	}
+
+	@Test
+	void iss11_searchMatchesTitleOrKeyCaseInsensitivelyAndCombinesWithFilters() throws Exception {
+		String key = newProject();
+		create("alice", key, "Login Page broken").andExpect(status().isFound());
+		mvc.perform(createRequest("alice", key, "Other thing").param("type", "BUG"));
+		list(key, "q", "login pAGE").andExpect(content().string(containsString("Login Page broken")))
+				.andExpect(content().string(not(containsString("Other thing"))));
+		list(key, "q", key.toLowerCase() + "-2").andExpect(content().string(containsString("Other thing")))
+				.andExpect(content().string(not(containsString("Login Page broken"))));
+		list(key, "q", "thing", "type", "TASK").andExpect(content().string(not(containsString("Other thing"))));
+		list(key, "q", "%").andExpect(content().string(containsString("No issues found")));
+	}
+
+	@Test
+	void iss12_invalidParametersReturn422WithoutAList() throws Exception {
+		String key = newProject();
+		create("alice", key, "Visible").andExpect(status().isFound());
+		for (String[] bad : new String[][] { { "status", "NOPE" }, { "type", "NOPE" }, { "assignee", "abc" },
+				{ "assignee", "999999" }, { "page", "0" }, { "page", "-1" }, { "page", "x" } }) {
+			list(key, bad).andExpect(status().isUnprocessableEntity())
+					.andExpect(content().string(not(containsString("Visible"))));
+		}
+	}
+
+	@Test
+	void iss13_pagingIs25PerPageAndOutOfRangeIsEmpty() throws Exception {
+		String key = newProject();
+		for (int i = 1; i <= 26; i++) {
+			create("alice", key, "Item" + i + "x").andExpect(status().isFound());
+		}
+		list(key).andExpect(content().string(containsString("Item26x")))
+				.andExpect(content().string(not(containsString("Item1x"))));
+		list(key, "page", "2").andExpect(status().isOk()).andExpect(content().string(containsString("Item1x")))
+				.andExpect(content().string(not(containsString("Item26x"))));
+		list(key, "page", "3").andExpect(status().isOk()).andExpect(content().string(containsString("No issues found")));
+	}
+
+	@Test
+	void iss14_htmxGetsOnlyTheFragment() throws Exception {
+		String key = newProject();
+		create("alice", key, "Frag").andExpect(status().isFound());
+		var path = "/projects/" + key + "/issues";
+		mvc.perform(get(path).with(user("alice")).header("HX-Request", "true")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("Frag"))).andExpect(content().string(not(containsString("<html"))));
+		mvc.perform(get(path).with(user("alice")).header("HX-Request", "true").param("status", "NOPE"))
+				.andExpect(status().isUnprocessableEntity()).andExpect(content().string(not(containsString("<html"))))
+				.andExpect(content().string(containsString("Unknown status")));
+		mvc.perform(get(path).with(user("alice")).header("HX-Request", "true").header("HX-History-Restore-Request", "true"))
+				.andExpect(content().string(containsString("<html")));
+		list(key).andExpect(content().string(containsString("<html")));
 	}
 }
