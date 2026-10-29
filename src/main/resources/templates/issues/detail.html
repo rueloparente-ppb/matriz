@@ -19,6 +19,8 @@
   </dl>
   <div th:hx-get="@{/projects/{key}/issues/{number}/comments(key=${project.key},number=${issue.number})}"
        hx-trigger="load" hx-swap="outerHTML">Loading comments…</div>
+  <div th:hx-get="@{/projects/{key}/issues/{number}/history(key=${project.key},number=${issue.number})}"
+       hx-trigger="load" hx-swap="outerHTML">Loading history…</div>
 </main>
 </body>
 </html>
