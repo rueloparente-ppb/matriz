@@ -8,5 +8,8 @@
       changed <span th:text="${entry.field}">field</span> from
       <span th:text="${entry.oldValue}">old</span> to <span th:text="${entry.newValue}">new</span>
     </span>
+    <span th:if="${entry.kind == 'SPRINT_CHANGED'}">
+      changed sprint from <span th:text="${entry.oldValue}">old</span> to <span th:text="${entry.newValue}">new</span>
+    </span>
   </div>
 </div>
