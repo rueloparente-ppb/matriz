@@ -5,20 +5,67 @@
 <body>
 <main class="container py-4">
   <div th:replace="~{issues/nav :: nav(${project})}"></div>
-  <p th:if="${#lists.isEmpty(issues)}" class="text-muted">No issues yet.</p>
-  <table class="table" th:unless="${#lists.isEmpty(issues)}">
-    <thead><tr><th>Key</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assignee</th></tr></thead>
-    <tbody>
-      <tr th:each="i : ${issues}">
-        <td><a th:href="@{/projects/{key}/issues/{n}(key=${project.key},n=${i.number})}" th:text="${i.key}">PROJ-1</a></td>
-        <td th:text="${i.title}">Title</td>
-        <td th:text="${i.type}">TASK</td>
-        <td th:text="${i.priority}">MEDIUM</td>
-        <td th:text="${i.status}">TO_DO</td>
-        <td th:text="${i.assigneeName}">Unassigned</td>
-      </tr>
-    </tbody>
-  </table>
+  <form method="get" class="row g-2 mb-3" th:action="@{/projects/{key}/issues(key=${project.key})}"
+        th:hx-get="@{/projects/{key}/issues(key=${project.key})}" hx-target="#issue-results"
+        hx-push-url="true" hx-trigger="change, input changed delay:300ms from:#q">
+    <div class="col-md-4">
+      <input id="q" name="q" type="search" class="form-control" placeholder="Search title or key"
+             th:value="${query.q}">
+    </div>
+    <div class="col-md-2">
+      <select name="status" class="form-select" aria-label="Status">
+        <option value="">Any status</option>
+        <option th:each="s : ${T(com.jiraclone.issues.IssueStatus).values()}" th:value="${s}" th:text="${s}"
+                th:selected="${s.name() == query.status}">TO_DO</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select name="type" class="form-select" aria-label="Type">
+        <option value="">Any type</option>
+        <option th:each="t : ${T(com.jiraclone.issues.IssueType).values()}" th:value="${t}" th:text="${t}"
+                th:selected="${t.name() == query.type}">TASK</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <select name="assignee" class="form-select" aria-label="Assignee">
+        <option value="">Any assignee</option>
+        <option value="none" th:selected="${query.assignee == 'none'}">Unassigned</option>
+        <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.displayName}"
+                th:selected="${#strings.toString(u.id) == query.assignee}">User</option>
+      </select>
+    </div>
+    <div class="col-md-1"><button type="submit" class="btn btn-outline-primary w-100">Filter</button></div>
+  </form>
+  <div id="issue-results" th:fragment="results">
+    <div th:each="e : ${errors}" class="alert alert-danger" role="alert" th:text="${e}">Error</div>
+    <th:block th:unless="${!#lists.isEmpty(errors)}">
+      <p th:if="${#lists.isEmpty(issues)}" class="text-muted">No issues found.</p>
+      <table class="table" th:unless="${#lists.isEmpty(issues)}">
+        <thead><tr><th>Key</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assignee</th></tr></thead>
+        <tbody>
+          <tr th:each="i : ${issues}">
+            <td><a th:href="@{/projects/{key}/issues/{n}(key=${project.key},n=${i.number})}" th:text="${i.key}">PROJ-1</a></td>
+            <td th:text="${i.title}">Title</td>
+            <td th:text="${i.type}">TASK</td>
+            <td th:text="${i.priority}">MEDIUM</td>
+            <td th:text="${i.status}">TO_DO</td>
+            <td th:text="${i.assigneeName}">Unassigned</td>
+          </tr>
+        </tbody>
+      </table>
+      <nav th:if="${totalPages > 1}" aria-label="Pages" class="d-flex gap-3 align-items-center">
+        <a th:if="${page > 1}" th:with="p=${page - 1}"
+           th:href="@{/projects/{key}/issues(key=${project.key},status=${query.status},type=${query.type},assignee=${query.assignee},q=${query.q},page=${p})}"
+           th:hx-get="@{/projects/{key}/issues(key=${project.key},status=${query.status},type=${query.type},assignee=${query.assignee},q=${query.q},page=${p})}"
+           hx-target="#issue-results" hx-push-url="true">Previous</a>
+        <span th:text="'Page ' + ${page} + ' of ' + ${totalPages}">Page 1 of 2</span>
+        <a th:if="${page < totalPages}" th:with="p=${page + 1}"
+           th:href="@{/projects/{key}/issues(key=${project.key},status=${query.status},type=${query.type},assignee=${query.assignee},q=${query.q},page=${p})}"
+           th:hx-get="@{/projects/{key}/issues(key=${project.key},status=${query.status},type=${query.type},assignee=${query.assignee},q=${query.q},page=${p})}"
+           hx-target="#issue-results" hx-push-url="true">Next</a>
+      </nav>
+    </th:block>
+  </div>
 </main>
 </body>
 </html>
