@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::title}, ~{::main})}">
+<head><title>New issue</title></head>
+<body>
+<main class="container py-4" style="max-width: 700px">
+  <div th:replace="~{issues/nav :: nav(${project})}"></div>
+  <h2 class="h4 mb-3">New issue</h2>
+  <form th:action="@{/projects/{key}/issues(key=${project.key})}" th:object="${form}" method="post" novalidate>
+    <div class="mb-3">
+      <label for="title" class="form-label">Title</label>
+      <input id="title" th:field="*{title}" class="form-control" th:classappend="${#fields.hasErrors('title')} ? 'is-invalid'" autofocus>
+      <div class="invalid-feedback" th:errors="*{title}">Title error</div>
+    </div>
+    <div class="mb-3">
+      <label for="description" class="form-label">Description</label>
+      <textarea id="description" th:field="*{description}" rows="5" class="form-control" th:classappend="${#fields.hasErrors('description')} ? 'is-invalid'"></textarea>
+      <div class="invalid-feedback" th:errors="*{description}">Description error</div>
+    </div>
+    <div class="row">
+      <div class="col mb-3">
+        <label for="type" class="form-label">Type</label>
+        <select id="type" th:field="*{type}" class="form-select" th:classappend="${#fields.hasErrors('type')} ? 'is-invalid'">
+          <option value="TASK">Task</option><option value="BUG">Bug</option><option value="STORY">Story</option>
+        </select>
+        <div class="invalid-feedback" th:errors="*{type}">Type error</div>
+      </div>
+      <div class="col mb-3">
+        <label for="priority" class="form-label">Priority</label>
+        <select id="priority" th:field="*{priority}" class="form-select" th:classappend="${#fields.hasErrors('priority')} ? 'is-invalid'">
+          <option value="LOW">Low</option><option value="MEDIUM">Medium</option><option value="HIGH">High</option>
+        </select>
+        <div class="invalid-feedback" th:errors="*{priority}">Priority error</div>
+      </div>
+      <div class="col mb-3">
+        <label for="assigneeId" class="form-label">Assignee</label>
+        <select id="assigneeId" th:field="*{assigneeId}" class="form-select" th:classappend="${#fields.hasErrors('assigneeId')} ? 'is-invalid'">
+          <option value="">Unassigned</option>
+          <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.displayName}">User</option>
+        </select>
+        <div class="invalid-feedback" th:errors="*{assigneeId}">Assignee error</div>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Create</button>
+    <a class="btn btn-link" th:href="@{/projects/{key}/issues(key=${project.key})}">Cancel</a>
+  </form>
+</main>
+</body>
+</html>

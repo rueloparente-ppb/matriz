@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div th:fragment="nav(project)" class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 m-0" th:text="${project.key} + ' · ' + ${project.name}">PROJ · Name</h1>
+  <div>
+    <a class="btn btn-outline-secondary" th:href="@{/projects/{key}/issues(key=${project.key})}">List</a>
+    <a class="btn btn-primary" th:href="@{/projects/{key}/issues/new(key=${project.key})}">New issue</a>
+  </div>
+</div>
+</body>
+</html>

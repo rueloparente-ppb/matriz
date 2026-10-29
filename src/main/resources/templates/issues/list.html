@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::title}, ~{::main})}">
+<head><title th:text="${project.key} + ' issues'">Issues</title></head>
+<body>
+<main class="container py-4">
+  <div th:replace="~{issues/nav :: nav(${project})}"></div>
+  <p th:if="${#lists.isEmpty(issues)}" class="text-muted">No issues yet.</p>
+  <table class="table" th:unless="${#lists.isEmpty(issues)}">
+    <thead><tr><th>Key</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assignee</th></tr></thead>
+    <tbody>
+      <tr th:each="i : ${issues}">
+        <td><a th:href="@{/projects/{key}/issues/{n}(key=${project.key},n=${i.number})}" th:text="${i.key}">PROJ-1</a></td>
+        <td th:text="${i.title}">Title</td>
+        <td th:text="${i.type}">TASK</td>
+        <td th:text="${i.priority}">MEDIUM</td>
+        <td th:text="${i.status}">TO_DO</td>
+        <td th:text="${i.assigneeName}">Unassigned</td>
+      </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>
