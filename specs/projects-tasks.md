@@ -20,8 +20,8 @@ Create and list projects with unique, immutable keys. This plan also introduces 
 **Estimated source lines:** ~40–70
 **Requirements:** Foundation for PRJ-3, PRJ-4, PRJ-5, PRJ-7
 
-- [ ] 1.1 Not-found exception mapped to a `404` error template; htmx requests get a small fragment. Check: test hitting a controller that raises it gets `404` with no stack trace.
-- [ ] 1.2 Convention or helper for rendering a form view with status `422`. Check: covered by group 3 tests.
+- [x] 1.1 Not-found exception mapped to a `404` error template; htmx requests get a small fragment. Check: test hitting a controller that raises it gets `404` with no stack trace.
+- [x] 1.2 Convention or helper for rendering a form view with status `422`. Check: covered by group 3 tests.
 
 ### 2. Project persistence
 
@@ -30,8 +30,8 @@ Create and list projects with unique, immutable keys. This plan also introduces 
 **Estimated source lines:** ~70–100
 **Requirements:** PRJ-5, PRJ-6, PRJ-9
 
-- [ ] 2.1 Flyway migration: projects (key unique, name, created_at, created_by). Check: migration applies in the Testcontainers test.
-- [ ] 2.2 Entity, repository (`findByKey`, all ordered by key) and create service that validates and maps the DB unique violation to a field error. Check: concurrency test with two parallel creates using the same key gives one project and one validation error, no `5xx` (PRJ-6).
+- [x] 2.1 Flyway migration: projects (key unique, name, created_at, created_by). Check: migration applies in the Testcontainers test.
+- [x] 2.2 Entity, repository (`findByKey`, all ordered by key) and create service that validates and maps the DB unique violation to a field error. Check: concurrency test with two parallel creates using the same key gives one project and one validation error, no `5xx` (PRJ-6).
 
 ### 3. Project pages
 
@@ -40,11 +40,11 @@ Create and list projects with unique, immutable keys. This plan also introduces 
 **Estimated source lines:** ~100–130
 **Requirements:** PRJ-1, PRJ-2, PRJ-3, PRJ-4, PRJ-5, PRJ-7, PRJ-8
 
-- [ ] 3.1 Controller and templates for list and new form, with Bean Validation for key `^[A-Z]{2,10}$` and trimmed name 1–100. Check: tests for PRJ-1, PRJ-3 (lowercase, 1 char, 11 chars, digits), PRJ-4, PRJ-5 (existing project unchanged).
-- [ ] 3.2 List sorted by key, showing projects from all users. Check: test with projects created by two users (PRJ-2).
-- [ ] 3.3 `GET /projects/{key}` redirects; an unknown key returns `404`. Check: tests for PRJ-7.
-- [ ] 3.4 Unauthenticated access. Check: tests for the browser and htmx variants (PRJ-8).
-- [ ] 3.5 Persistence across a context restart. Check: test (PRJ-9).
+- [x] 3.1 Controller and templates for list and new form, with Bean Validation for key `^[A-Z]{2,10}$` and trimmed name 1–100. Check: tests for PRJ-1, PRJ-3 (lowercase, 1 char, 11 chars, digits), PRJ-4, PRJ-5 (existing project unchanged).
+- [x] 3.2 List sorted by key, showing projects from all users. Check: test with projects created by two users (PRJ-2).
+- [x] 3.3 `GET /projects/{key}` redirects; an unknown key returns `404`. Check: tests for PRJ-7.
+- [x] 3.4 Unauthenticated access. Check: tests for the browser and htmx variants (PRJ-8).
+- [x] 3.5 Persistence across a context restart. Check: test (PRJ-9).
 
 ## Coverage and ordering
 

@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::title}, ~{::main})}">
+<head><title>Not found</title></head>
+<body>
+<main class="container py-5">
+  <div th:fragment="notFound">
+    <h1 class="h3">Not found</h1>
+    <p>The page you asked for does not exist.</p>
+    <a th:href="@{/projects}">Back to projects</a>
+  </div>
+</main>
+</body>
+</html>
