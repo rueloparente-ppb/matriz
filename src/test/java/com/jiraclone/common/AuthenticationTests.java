@@ -142,8 +142,7 @@ class AuthenticationTests extends AbstractIntegrationTest {
 	@Test
 	void navbarShowsDisplayNameAndLogoutWhenLoggedIn() throws Exception {
 		MockHttpSession session = login("alice", "password");
-		// /error is permitted; any rendered page will do, use the login page
-		mvc.perform(get("/login").session(session))
+		mvc.perform(get("/projects").session(session))
 				.andExpect(content().string(org.hamcrest.Matchers.containsString("Alice Anderson")))
 				.andExpect(content().string(org.hamcrest.Matchers.containsString("action=\"/logout\"")));
 	}

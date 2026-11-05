@@ -83,6 +83,19 @@ Budget: ~300 production lines per PR (the user's budget, which replaces the skil
 - [x] 3.4 Login page template, navbar logout button and display name, `GET /` → `/projects`. Check: test that `/` redirects; manual check of the login page.
 - [x] 3.5 Restart persistence. Check: test that logs in with a seeded user against a fresh context (AUTH-7).
 
+### 4. User registration
+
+**Commit intent:** Public `/register` form (username, password, confirmation) that creates a user, signs them in, and redirects authenticated visitors away from `/login` and `/register`.
+**PR:** 3
+**Dependencies:** 3
+**Estimated source lines:** ~200
+**Requirements:** AUTH-10 to AUTH-21
+
+- [x] 4.1 Registration service and entity factory: case-insensitive duplicate check, bcrypt hash, display name = username, unique-index race mapped to "username already taken". Check: `RegistrationTests` AUTH-11, AUTH-12, AUTH-16, AUTH-17.
+- [x] 4.2 `RegistrationController`, form validation (username rules and trimming, password length and 72-byte limit, confirmation), `422` re-render without echoing passwords. Check: AUTH-13, AUTH-14, AUTH-15, AUTH-21.
+- [x] 4.3 Security configuration permits `/register`; session saved on auto-login; `/login` and `/register` redirect authenticated users to `/`. Check: AUTH-10, AUTH-18, AUTH-19, AUTH-20.
+- [x] 4.4 Register and login pages link to each other. Check: manual.
+
 ## Coverage and ordering
 
 | Requirement | Group |
@@ -93,5 +106,6 @@ Budget: ~300 production lines per PR (the user's budget, which replaces the skil
 | AUTH-7 | 2, 3 |
 | AUTH-8 | 2, 3 |
 | AUTH-9 | 2 |
+| AUTH-10 to AUTH-21 | 4 |
 
-The groups run strictly in order 1 → 2 → 3. No group depends on a later PR.
+The groups run strictly in order 1 → 2 → 3 → 4. No group depends on a later PR.

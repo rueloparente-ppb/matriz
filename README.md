@@ -18,7 +18,7 @@ DB settings default to the compose values; override with `DB_URL`, `DB_USERNAME`
 
 ## Seeded users
 
-Every page except `/login` requires a login. Development users (seeded by Flyway): `alice`, `bob`, `carol`, all with password `password`. Usernames are case-insensitive. These are for local use only.
+Every page except `/login` and `/register` requires a login; anyone can register with a username and password at `/register`. Development users (seeded by Flyway): `alice`, `bob`, `carol`, all with password `password`. Usernames are case-insensitive. These are for local use only.
 
 ## Test
 
