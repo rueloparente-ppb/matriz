@@ -13,6 +13,15 @@
   </div>
   <div id="board" th:fragment="board">
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="${error}">Move rejected</div>
+    <form method="get" th:action="@{/projects/{key}/board(key=${project.key})}" class="mb-3">
+      <label for="board-sprint">Sprint</label>
+      <select id="board-sprint" name="sprint" class="form-select" onchange="this.form.requestSubmit()">
+        <option value="" th:selected="${sprintFilter == ''}">All</option>
+        <option value="none" th:selected="${sprintFilter == 'none'}">No sprint</option>
+        <option th:each="sprint : ${sprints}" th:value="${sprint.id}" th:text="${sprint.name}" th:selected="${sprintFilter == sprint.id.toString()}">Sprint</option>
+      </select>
+      <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
+    </form>
     <div class="row g-3">
       <section class="col-md-4" th:each="s : ${statuses}">
         <h2 class="h6" th:text="${s.name() == 'TO_DO' ? 'To Do' : (s.name() == 'DONE' ? 'Done' : 'In Progress')} + ' (' + ${#lists.size(columns.get(s))} + ')'">To Do</h2>
@@ -41,7 +50,8 @@
             if (event.from === event.to) return;
             htmx.ajax('POST', url, {
               target: '#board', swap: 'outerHTML',
-              values: {issue: event.item.dataset.issue, status: event.to.dataset.status},
+              values: {issue: event.item.dataset.issue, status: event.to.dataset.status,
+                ...(document.querySelector('#board-sprint').value && {sprint: document.querySelector('#board-sprint').value})},
               headers: JSON.parse(document.body.getAttribute('hx-headers'))
             });
           }

@@ -5,8 +5,11 @@ import com.jiraclone.issues.IssueRef;
 import com.jiraclone.issues.IssueStatus;
 import com.jiraclone.issues.IssuesApi;
 import com.jiraclone.sprints.IssueSprintChanged;
+import com.jiraclone.sprints.SprintSummary;
+import com.jiraclone.sprints.SprintsApi;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.context.ApplicationEventPublisher;
@@ -17,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
-public class SprintService {
+public class SprintService implements SprintsApi {
 	private final SprintRepository sprints;
 	private final JdbcTemplate jdbc;
 	private final IssuesApi issues;
@@ -33,10 +36,9 @@ public class SprintService {
 		this.transactions = transactions;
 	}
 
-	public record Entry(long id, String name, String state, long issueCount) { }
-
+	@Override
 	@Transactional(readOnly = true)
-	public List<Entry> list(long projectId) {
+	public List<SprintSummary> list(long projectId) {
 		Map<Long, Long> counts = jdbc.query("select sprint_id, count(*) from sprint_issue where sprint_id in "
 				+ "(select id from sprint where project_id = ?) group by sprint_id", rs -> {
 					Map<Long, Long> result = new java.util.HashMap<>();
@@ -44,8 +46,61 @@ public class SprintService {
 					return result;
 				}, projectId);
 		return sprints.findByProjectIdOrderByIdAsc(projectId).stream()
-				.map(s -> new Entry(s.getId(), s.getName(), s.getState().name(), counts.getOrDefault(s.getId(), 0L)))
+				.map(s -> new SprintSummary(s.getId(), s.getName(), s.getState().name(), counts.getOrDefault(s.getId(), 0L)))
 				.toList();
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Set<Long> issueIds(long projectId, String filter) {
+		if (filter.equals("none")) {
+			Set<Long> assigned = Set.copyOf(jdbc.queryForList("select si.issue_id from sprint_issue si "
+					+ "join sprint s on s.id=si.sprint_id where s.project_id=?", Long.class, projectId));
+			return issues.findByProject(projectId).stream().map(IssueRef::id)
+					.filter(id -> !assigned.contains(id)).collect(Collectors.toSet());
+		}
+		long id = parseId(filter);
+		find(projectId, id);
+		return Set.copyOf(jdbc.queryForList("select issue_id from sprint_issue where sprint_id=?", Long.class, id));
+	}
+
+	@Transactional
+	public void assign(long projectId, int number, String raw, long actorId) {
+		IssueRef issue = issues.findIssue(projectId, number)
+				.orElseThrow(() -> new NotFoundException("Issue " + number));
+		Sprint next = raw.isEmpty() || raw.equals("none") ? null : find(projectId, parseId(raw));
+		if (next != null && next.getState() == Sprint.State.COMPLETED)
+			throw new IllegalArgumentException("Completed sprint cannot receive issues");
+		List<Long> oldIds = jdbc.queryForList("select sprint_id from sprint_issue where issue_id=?", Long.class, issue.id());
+		Sprint old = oldIds.isEmpty() ? null : find(projectId, oldIds.getFirst());
+		if (old == null && next == null || old != null && next != null && old.getId().equals(next.getId())) return;
+		if (next == null) jdbc.update("delete from sprint_issue where issue_id=?", issue.id());
+		else jdbc.update("insert into sprint_issue(issue_id,sprint_id) values (?,?) "
+				+ "on conflict (issue_id) do update set sprint_id=excluded.sprint_id", issue.id(), next.getId());
+		issues.markUpdated(issue.id());
+		events.publishEvent(new IssueSprintChanged(issue.id(), actorId,
+				old == null ? "None" : old.getName(), next == null ? "None" : next.getName()));
+	}
+
+	@Transactional(readOnly = true)
+	public String currentName(long projectId, long issueId) {
+		List<Long> ids = jdbc.queryForList("select sprint_id from sprint_issue where issue_id=?", Long.class, issueId);
+		return ids.isEmpty() ? "None" : find(projectId, ids.getFirst()).getName();
+	}
+
+	@Transactional(readOnly = true)
+	public String currentId(long issueId) {
+		List<Long> ids = jdbc.queryForList("select sprint_id from sprint_issue where issue_id=?", Long.class, issueId);
+		return ids.isEmpty() ? "none" : ids.getFirst().toString();
+	}
+
+	private static long parseId(String raw) {
+		if (!raw.matches("[1-9][0-9]*")) throw new IllegalArgumentException("Invalid sprint");
+		try {
+			long id = Long.parseLong(raw);
+			if (id > 0) return id;
+		} catch (NumberFormatException ignored) { }
+		throw new IllegalArgumentException("Invalid sprint");
 	}
 
 	/** Separate write transaction lets us classify a failed unique constraint in a fresh transaction. */
