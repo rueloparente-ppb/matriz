@@ -12,7 +12,7 @@
           th:hx-post="@{/projects/{key}/sprints(key=${project.key})}" hx-target="#sprints">
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
       <label for="sprint-name">Name</label>
-      <input id="sprint-name" name="name" maxlength="100" required th:value="${name}">
+      <input id="sprint-name" name="name" class="form-control" maxlength="100" required th:value="${name}">
       <button type="submit" class="btn btn-primary">Create sprint</button>
     </form>
     <table class="table mt-3">
@@ -20,7 +20,7 @@
       <tbody>
         <tr th:each="sprint : ${sprints}">
           <td th:text="${sprint.name}">Sprint</td>
-          <td th:text="${sprint.state}">PLANNED</td>
+          <td><span class="badge" th:attr="data-value=${sprint.state}" th:text="${sprint.state}">PLANNED</span></td>
           <td th:text="${sprint.issueCount}">0</td>
           <td>
             <form th:if="${sprint.state == 'PLANNED'}" method="post"

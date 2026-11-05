@@ -3,7 +3,7 @@
       th:replace="~{layout/base :: layout(~{::title}, ~{::main})}">
 <head><title>New project</title></head>
 <body>
-<main class="container py-4" style="max-width: 500px">
+<main class="container py-4 form-page">
   <h1 class="h3 mb-3">New project</h1>
   <form th:action="@{/projects}" th:object="${form}" method="post" novalidate>
     <div class="mb-3">
