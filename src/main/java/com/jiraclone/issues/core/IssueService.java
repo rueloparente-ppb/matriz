@@ -69,6 +69,11 @@ public class IssueService implements IssuesApi {
 	}
 
 	@Override
+	public List<IssueRef> findByProject(long projectId) {
+		return issues.findByProjectIdOrderByNumberAsc(projectId).stream().map(IssueService::toRef).toList();
+	}
+
+	@Override
 	@Transactional
 	public IssueRef changeStatus(long projectId, int number, IssueStatus status, long actorId) {
 		updateField(projectId, number, "status", status.name(), actorId);
