@@ -1,0 +1,16 @@
+<div xmlns:th="http://www.thymeleaf.org" th:fragment="comments" id="comments">
+  <h3 class="h5">Comments</h3>
+  <div th:each="comment : ${comments}" class="mb-3">
+    <strong th:text="${comment.author}">Author</strong>
+    <time th:text="${comment.createdAt}">Time</time>
+    <div style="white-space: pre-wrap" th:text="${comment.body}">Body</div>
+  </div>
+  <form method="post" th:action="@{/projects/{key}/issues/{number}/comments(key=${project.key},number=${number})}"
+        th:hx-post="@{/projects/{key}/issues/{number}/comments(key=${project.key},number=${number})}"
+        hx-target="#comments" hx-swap="outerHTML">
+    <label for="comment-body">Add a comment</label>
+    <textarea id="comment-body" name="body" class="form-control" maxlength="2000" th:text="${body}"></textarea>
+    <p th:if="${error}" class="text-danger" th:text="${error}"></p>
+    <button class="btn btn-primary mt-2" type="submit">Comment</button>
+  </form>
+</div>
