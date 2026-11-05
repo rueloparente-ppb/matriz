@@ -27,6 +27,12 @@ class AppUser {
 	protected AppUser() {
 	}
 
+	AppUser(String username, String passwordHash) {
+		this.username = username;
+		this.displayName = username;
+		this.passwordHash = passwordHash;
+	}
+
 	Long getId() {
 		return id;
 	}
