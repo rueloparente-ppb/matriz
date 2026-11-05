@@ -3,7 +3,7 @@
 <body>
 <div id="issue-sprint" th:fragment="picker">
   <label for="sprint-choice">Sprint</label>
-  <span th:text="${currentName}">None</span>
+  <span class="badge" th:text="${currentName}">None</span>
   <form method="post" th:action="@{/projects/{key}/issues/{number}/sprint(key=${project.key},number=${number})}"
         th:hx-post="@{/projects/{key}/issues/{number}/sprint(key=${project.key},number=${number})}"
         hx-target="#issue-sprint" hx-swap="outerHTML">

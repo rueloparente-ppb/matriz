@@ -13,7 +13,7 @@
   </div>
   <div id="board" th:fragment="board">
     <div th:if="${error}" class="alert alert-danger" role="alert" th:text="${error}">Move rejected</div>
-    <form method="get" th:action="@{/projects/{key}/board(key=${project.key})}" class="mb-3">
+    <form method="get" th:action="@{/projects/{key}/board(key=${project.key})}" class="mb-3 board-filter">
       <label for="board-sprint">Sprint</label>
       <select id="board-sprint" name="sprint" class="form-select" onchange="this.form.requestSubmit()">
         <option value="" th:selected="${sprintFilter == ''}">All</option>
@@ -23,15 +23,17 @@
       <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
     </form>
     <div class="row g-3">
-      <section class="col-md-4" th:each="s : ${statuses}">
+      <section class="col-md-4 board-lane" th:each="s : ${statuses}">
         <h2 class="h6" th:text="${s.name() == 'TO_DO' ? 'To Do' : (s.name() == 'DONE' ? 'Done' : 'In Progress')} + ' (' + ${#lists.size(columns.get(s))} + ')'">To Do</h2>
-        <div class="board-column border rounded p-2 d-grid gap-2 align-content-start h-100" style="min-height: 12rem"
+        <div class="board-column border rounded p-2 d-grid gap-2 align-content-start h-100"
              th:attr="data-status=${s}">
           <article class="card p-2" th:each="card : ${columns.get(s)}" th:attr="data-issue=${card.issue.number}">
             <div><a th:href="@{/projects/{key}/issues/{n}(key=${project.key},n=${card.issue.number})}"
                     th:text="${project.key} + '-' + ${card.issue.number}">PROJ-1</a>
               <span th:text="${card.issue.title}">Title</span></div>
-            <small class="text-muted" th:text="${card.issue.type} + ' · ' + ${card.issue.priority} + ' · ' + ${card.assignee}">Type · Priority · Assignee</small>
+            <div class="board-card-meta"><span class="badge" th:attr="data-value=${card.issue.type}" th:text="${card.issue.type}">TASK</span>
+              <span class="badge" th:attr="data-value=${card.issue.priority}" th:text="${card.issue.priority}">MEDIUM</span>
+              <small class="text-muted" th:text="${card.assignee}">Assignee</small></div>
           </article>
         </div>
       </section>

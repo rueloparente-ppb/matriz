@@ -1,9 +1,10 @@
 <div xmlns:th="http://www.thymeleaf.org" th:fragment="comments" id="comments">
   <h3 class="h5">Comments</h3>
-  <div th:each="comment : ${comments}" class="mb-3">
+  <p th:if="${#lists.isEmpty(comments)}" class="text-muted">No comments yet.</p>
+  <div th:each="comment : ${comments}" class="mb-3 timeline-entry">
     <strong th:text="${comment.author}">Author</strong>
     <time th:text="${comment.createdAt}">Time</time>
-    <div style="white-space: pre-wrap" th:text="${comment.body}">Body</div>
+    <div class="field-value" style="white-space: pre-wrap" th:text="${comment.body}">Body</div>
   </div>
   <form method="post" th:action="@{/projects/{key}/issues/{number}/comments(key=${project.key},number=${number})}"
         th:hx-post="@{/projects/{key}/issues/{number}/comments(key=${project.key},number=${number})}"
