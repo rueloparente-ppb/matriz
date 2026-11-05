@@ -8,6 +8,7 @@ import com.jiraclone.issues.IssuePriority;
 import com.jiraclone.issues.IssueType;
 import com.jiraclone.issues.core.IssueDetail;
 import com.jiraclone.issues.core.IssueService;
+import com.jiraclone.issues.core.InvalidIssueFieldException;
 import com.jiraclone.projects.ProjectRef;
 import com.jiraclone.projects.ProjectsApi;
 import jakarta.validation.Valid;
@@ -16,6 +17,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
@@ -29,12 +31,14 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 class IssueController {
 
 	private static final String LIST_VIEW = "issues/list";
 	private static final String FORM_VIEW = "issues/new";
+	private static final Set<String> EDITABLE = Set.of("title", "description", "type", "priority", "status", "assignee");
 	private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 			.withZone(ZoneId.systemDefault());
 
@@ -109,6 +113,60 @@ class IssueController {
 				.orElseThrow(() -> new NotFoundException("Issue " + project.key() + "-" + number));
 		model.addAttribute("issue", toView(project, issue, userIndex()));
 		return "issues/detail";
+	}
+
+	@GetMapping("/projects/{key}/issues/{number}/{field}")
+	String field(@ModelAttribute("project") ProjectRef project, @PathVariable int number, @PathVariable String field,
+			Model model) {
+		fieldModel(project, number, field, model);
+		return "issues/field :: view";
+	}
+
+	@GetMapping("/projects/{key}/issues/{number}/{field}/edit")
+	String edit(@ModelAttribute("project") ProjectRef project, @PathVariable int number, @PathVariable String field,
+			Model model) {
+		IssueDetail issue = fieldModel(project, number, field, model);
+		model.addAttribute("value", fieldValue(issue, field));
+		return "issues/field :: edit";
+	}
+
+	@PostMapping("/projects/{key}/issues/{number}/{field}")
+	Object update(@ModelAttribute("project") ProjectRef project, @PathVariable int number, @PathVariable String field,
+			@RequestParam(defaultValue = "") String value, Model model) {
+		IssueDetail issue = fieldModel(project, number, field, model);
+		try {
+			IssueDetail updated = issues.updateField(project.id(), number, field, value, identity.currentUser().orElseThrow().id());
+			model.addAttribute("issue", toView(project, updated, userIndex()));
+			return "issues/field :: view";
+		} catch (InvalidIssueFieldException ex) {
+			model.addAttribute("value", value);
+			model.addAttribute("error", ex.getMessage());
+			return ErrorViews.unprocessable("issues/field :: edit");
+		}
+	}
+
+	private IssueDetail fieldModel(ProjectRef project, int number, String field, Model model) {
+		if (!EDITABLE.contains(field)) {
+			throw new NotFoundException("Issue field " + field);
+		}
+		IssueDetail issue = issues.find(project.id(), number)
+				.orElseThrow(() -> new NotFoundException("Issue " + project.key() + "-" + number));
+		model.addAttribute("issue", toView(project, issue, userIndex()));
+		model.addAttribute("field", field);
+		model.addAttribute("users", identity.listUsers());
+		return issue;
+	}
+
+	private static String fieldValue(IssueDetail issue, String field) {
+		return switch (field) {
+			case "title" -> issue.title();
+			case "description" -> issue.description();
+			case "type" -> issue.type().name();
+			case "priority" -> issue.priority().name();
+			case "status" -> issue.status().name();
+			case "assignee" -> issue.assigneeId().isPresent() ? String.valueOf(issue.assigneeId().getAsLong()) : "none";
+			default -> throw new NotFoundException("Issue field " + field);
+		};
 	}
 
 	/** Blank means unassigned; anything that is not an existing user id is a validation error (ISS-4). */

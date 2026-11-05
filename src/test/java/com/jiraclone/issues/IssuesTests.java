@@ -27,13 +27,20 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.test.context.event.ApplicationEvents;
+import org.springframework.test.context.event.RecordApplicationEvents;
 
+@RecordApplicationEvents
 class IssuesTests extends AbstractIntegrationTest {
 
 	@Autowired
 	MockMvc mvc;
 	@Autowired
 	JdbcTemplate jdbc;
+	@Autowired
+	ApplicationEvents events;
+	@Autowired
+	IssuesApi api;
 
 	private String newProject() throws Exception {
 		var sb = new StringBuilder();
@@ -323,5 +330,111 @@ class IssuesTests extends AbstractIntegrationTest {
 		mvc.perform(get(path).with(user("alice")).header("HX-Request", "true").header("HX-History-Restore-Request", "true"))
 				.andExpect(content().string(containsString("<html")));
 		list(key).andExpect(content().string(containsString("<html")));
+	}
+
+	private MockHttpServletRequestBuilder editRequest(String key, String field, String value) {
+		return post("/projects/" + key + "/issues/1/" + field).with(user("bob")).with(csrf())
+				.header("HX-Request", "true").param("value", value);
+	}
+
+	private Object updatedAt(String key) {
+		return jdbc.queryForObject("select i.updated_at from issue i join project p on p.id=i.project_id "
+				+ "where p.key=? and i.number=1", java.time.OffsetDateTime.class, key);
+	}
+
+	@Test
+	void iss15_fieldsUpdateIndependentlyAndPublishDisplayValues() throws Exception {
+		String key = newProject();
+		create("alice", key, "First").andExpect(status().isFound());
+		Object before = updatedAt(key);
+		for (String[] change : new String[][] { { "title", " Second " }, { "description", "<b>hello</b>" },
+				{ "type", "BUG" }, { "priority", "HIGH" }, { "status", "DONE" },
+				{ "assignee", "" + userId("bob") } }) {
+			mvc.perform(editRequest(key, change[0], change[1])).andExpect(status().isOk())
+					.andExpect(content().string(not(containsString("<html"))));
+		}
+		assertThat(updatedAt(key)).isNotEqualTo(before);
+		var row = jdbc.queryForMap("select i.title,i.description,i.type,i.priority,i.status,i.assignee_id "
+				+ "from issue i join project p on p.id=i.project_id where p.key=?", key);
+		assertThat(row).containsEntry("title", "Second").containsEntry("description", "<b>hello</b>")
+				.containsEntry("type", "BUG").containsEntry("priority", "HIGH").containsEntry("status", "DONE")
+				.containsEntry("assignee_id", userId("bob"));
+		assertThat(events.stream(IssueCreated.class)).hasSize(1);
+		assertThat(events.stream(IssueFieldChanged.class)).hasSize(6);
+		assertThat(events.stream(IssueFieldChanged.class).filter(e -> e.field().equals("assignee")))
+				.singleElement().satisfies(e -> assertThat(e.oldValue()).isEqualTo("None"))
+				.satisfies(e -> assertThat(e.newValue()).isEqualTo("Bob Brown"));
+		mvc.perform(get("/projects/" + key + "/issues/1").with(user("alice"))).andExpect(status().isOk())
+				.andExpect(content().string(containsString("&lt;b&gt;hello&lt;/b&gt;")));
+	}
+
+	@Test
+	void iss16_iss17_invalidAndNoopLeaveTimestampAndEventsUnchanged() throws Exception {
+		String key = newProject();
+		create("alice", key, "First").andExpect(status().isFound());
+		Object before = updatedAt(key);
+		for (String[] change : new String[][] { { "title", " " }, { "title", "a".repeat(201) },
+				{ "description", "a".repeat(5001) }, { "type", "EPIC" }, { "priority", "URGENT" },
+				{ "status", "BLOCKED" }, { "assignee", "999999" }, { "assignee", "abc" } }) {
+			mvc.perform(editRequest(key, change[0], change[1])).andExpect(status().isUnprocessableEntity())
+					.andExpect(content().string(containsString("text-danger")))
+					.andExpect(content().string(containsString("name=\"value\"")));
+		}
+		for (String[] same : new String[][] { { "title", " First " }, { "description", "" },
+				{ "type", "TASK" }, { "priority", "MEDIUM" }, { "status", "TO_DO" },
+				{ "assignee", "none" }, { "assignee", "" } }) {
+			mvc.perform(editRequest(key, same[0], same[1])).andExpect(status().isOk());
+		}
+		assertThat(updatedAt(key)).isEqualTo(before);
+		assertThat(events.stream(IssueFieldChanged.class)).isEmpty();
+	}
+
+	@Test
+	void iss18_iss19_protectedAndUnknownFields404AndAssigneeClears() throws Exception {
+		String key = newProject();
+		create("alice", key, "First").andExpect(status().isFound());
+		for (String field : List.of("unknown", "key", "number", "reporter", "createdAt", "updatedAt")) {
+			mvc.perform(editRequest(key, field, "evil")).andExpect(status().isNotFound());
+		}
+		mvc.perform(editRequest("NOPE", "title", "bad")).andExpect(status().isNotFound());
+		mvc.perform(editRequest(key, "assignee", "" + userId("bob"))).andExpect(status().isOk());
+		mvc.perform(editRequest(key, "assignee", "none")).andExpect(status().isOk())
+				.andExpect(content().string(containsString("Unassigned")));
+		mvc.perform(editRequest(key, "assignee", "" + userId("bob"))).andExpect(status().isOk());
+		mvc.perform(editRequest(key, "assignee", "")).andExpect(status().isOk());
+		assertThat(jdbc.queryForObject("select assignee_id from issue i join project p on p.id=i.project_id "
+				+ "where p.key=?", Long.class, key)).isNull();
+		assertThat(events.stream(IssueFieldChanged.class)).hasSize(4);
+	}
+
+	@Test
+	void inlineFragmentsRenderEditCancelAndSecurity() throws Exception {
+		String key = newProject();
+		create("alice", key, "First").andExpect(status().isFound());
+		String base = "/projects/" + key + "/issues/1/title";
+		mvc.perform(get(base + "/edit").with(user("alice")).header("HX-Request", "true"))
+				.andExpect(status().isOk()).andExpect(content().string(containsString("name=\"_csrf\"")))
+				.andExpect(content().string(containsString("hx-post")));
+		mvc.perform(get(base).with(user("alice"))).andExpect(status().isOk())
+				.andExpect(content().string(containsString("First")));
+		mvc.perform(editRequest(key, "title", "No token").with(csrf().useInvalidToken()))
+				.andExpect(status().isForbidden());
+		mvc.perform(post(base).with(csrf()).param("value", "Secret"))
+				.andExpect(status().isFound()).andExpect(redirectedUrl("/login"));
+		assertThat(events.stream(IssueFieldChanged.class)).isEmpty();
+	}
+
+	@Test
+	void boardApiUsesSameStatusUpdateAndNoopRules() throws Exception {
+		String key = newProject();
+		create("alice", key, "First").andExpect(status().isFound());
+		long projectId = jdbc.queryForObject("select id from project where key=?", Long.class, key);
+		assertThat(api.findIssue(projectId, 1)).isPresent();
+		assertThat(api.findByIds(List.of(api.findIssue(projectId, 1).orElseThrow().id()))).hasSize(1);
+		api.changeStatus(projectId, 1, IssueStatus.DONE, userId("bob"));
+		Object before = updatedAt(key);
+		api.changeStatus(projectId, 1, IssueStatus.DONE, userId("bob"));
+		assertThat(updatedAt(key)).isEqualTo(before);
+		assertThat(events.stream(IssueFieldChanged.class)).hasSize(1);
 	}
 }
