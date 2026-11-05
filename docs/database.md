@@ -94,6 +94,7 @@ This is the data model for the Jira clone MVP. It is derived from the specs in [
 | `id` | `bigint` identity | no | PK; breaks ties in ordering — HST-7 |
 | `issue_id` | `bigint` | no | FK → `issue.id` |
 | `actor_id` | `bigint` | no | FK → `app_user.id` |
+| `actor_name` | `varchar(100)` | no | Actor's display name captured at write time, so later renames do not change history |
 | `kind` | `varchar(20)` | no | `CHECK IN ('CREATED','FIELD_CHANGED','SPRINT_CHANGED')` |
 | `field` | `varchar(20)` | yes | Required when `kind = 'FIELD_CHANGED'`, null otherwise (`CHECK`) |
 | `old_value` | `text` | yes | Display value at write time, full length — HST-9 |
@@ -186,6 +187,7 @@ erDiagram
         bigint id PK
         bigint issue_id FK
         bigint actor_id FK
+        varchar actor_name "display name at write time"
         varchar kind "CREATED, FIELD_CHANGED, SPRINT_CHANGED"
         varchar field "only for FIELD_CHANGED"
         text old_value "display value"

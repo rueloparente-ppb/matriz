@@ -3,7 +3,7 @@
       th:replace="~{layout/base :: layout(~{::title}, ~{::main})}">
 <head><title>New issue</title></head>
 <body>
-<main class="container py-4" style="max-width: 700px">
+<main class="container py-4 issue-form-page">
   <div th:replace="~{issues/nav :: nav(${project})}"></div>
   <h2 class="h4 mb-3">New issue</h2>
   <form th:action="@{/projects/{key}/issues(key=${project.key})}" th:object="${form}" method="post" novalidate>

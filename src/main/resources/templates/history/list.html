@@ -1,0 +1,16 @@
+<div xmlns:th="http://www.thymeleaf.org" th:fragment="history" id="history">
+  <h3 class="h5">History</h3>
+  <p th:if="${#lists.isEmpty(entries)}" class="text-muted">No history yet.</p>
+  <div th:each="entry : ${entries}" class="mb-2 timeline-entry">
+    <strong th:text="${entry.actor}">Actor</strong>
+    <time th:text="${entry.createdAt}">Time</time>
+    <span th:if="${entry.kind == 'CREATED'}">created this issue</span>
+    <span th:if="${entry.kind == 'FIELD_CHANGED'}">
+      changed <span th:text="${entry.field}">field</span> from
+      <span th:text="${entry.oldValue}">old</span> to <span th:text="${entry.newValue}">new</span>
+    </span>
+    <span th:if="${entry.kind == 'SPRINT_CHANGED'}">
+      changed sprint from <span th:text="${entry.oldValue}">old</span> to <span th:text="${entry.newValue}">new</span>
+    </span>
+  </div>
+</div>
