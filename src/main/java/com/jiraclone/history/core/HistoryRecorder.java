@@ -3,6 +3,7 @@ package com.jiraclone.history.core;
 import com.jiraclone.identity.IdentityApi;
 import com.jiraclone.issues.IssueCreated;
 import com.jiraclone.issues.IssueFieldChanged;
+import com.jiraclone.sprints.IssueSprintChanged;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -29,6 +30,12 @@ public class HistoryRecorder {
 	@Transactional(propagation = Propagation.MANDATORY)
 	public void changed(IssueFieldChanged event) {
 		record(event.issueId(), event.actorId(), "FIELD_CHANGED", event.field(), event.oldValue(), event.newValue());
+	}
+
+	@EventListener
+	@Transactional(propagation = Propagation.MANDATORY)
+	public void sprintChanged(IssueSprintChanged event) {
+		record(event.issueId(), event.actorId(), "SPRINT_CHANGED", null, event.oldValue(), event.newValue());
 	}
 
 	private void record(long issueId, long actorId, String kind, String field, String oldValue, String newValue) {
