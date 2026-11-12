@@ -2,6 +2,7 @@ package com.jiraclone.history.web;
 
 import com.jiraclone.common.NotFoundException;
 import com.jiraclone.history.core.HistoryService;
+import com.jiraclone.identity.IdentityApi;
 import com.jiraclone.projects.ProjectRef;
 import com.jiraclone.projects.ProjectsApi;
 import org.springframework.stereotype.Controller;
@@ -15,15 +16,18 @@ class HistoryController {
 
 	private final ProjectsApi projects;
 	private final HistoryService history;
+	private final IdentityApi identity;
 
-	HistoryController(ProjectsApi projects, HistoryService history) {
+	HistoryController(ProjectsApi projects, HistoryService history, IdentityApi identity) {
 		this.projects = projects;
 		this.history = history;
+		this.identity = identity;
 	}
 
 	@ModelAttribute("project")
 	ProjectRef project(@PathVariable String key) {
-		return projects.findByKey(key).orElseThrow(() -> new NotFoundException("Project " + key));
+		return projects.findAccessible(key, identity.currentUser().orElseThrow().id())
+				.orElseThrow(() -> new NotFoundException("Project " + key)).project();
 	}
 
 	@GetMapping("/projects/{key}/issues/{number}/history")

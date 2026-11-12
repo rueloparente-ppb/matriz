@@ -32,14 +32,6 @@
         </select>
         <div class="invalid-feedback" th:errors="*{priority}">Priority error</div>
       </div>
-      <div class="col mb-3">
-        <label for="assigneeId" class="form-label">Assignee</label>
-        <select id="assigneeId" th:field="*{assigneeId}" class="form-select" th:classappend="${#fields.hasErrors('assigneeId')} ? 'is-invalid'">
-          <option value="">Unassigned</option>
-          <option th:each="u : ${users}" th:value="${u.id}" th:text="${u.displayName}">User</option>
-        </select>
-        <div class="invalid-feedback" th:errors="*{assigneeId}">Assignee error</div>
-      </div>
     </div>
     <button type="submit" class="btn btn-primary">Create</button>
     <a class="btn btn-link" th:href="@{/projects/{key}/issues(key=${project.key})}">Cancel</a>

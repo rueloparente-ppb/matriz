@@ -38,6 +38,8 @@ class ProjectsTests extends AbstractIntegrationTest {
 	JdbcTemplate jdbc;
 	@Autowired
 	DataSource dataSource;
+	@Autowired
+	ProjectsApi projects;
 
 	/** Random 6-letter key so tests sharing one database never collide. */
 	private static String randomKey() {
@@ -68,18 +70,20 @@ class ProjectsTests extends AbstractIntegrationTest {
 	}
 
 	@Test
-	void prj2_listIsSortedByKeyAndShowsAllUsersProjects() throws Exception {
+	void prj2_listIsSortedByKeyAndOnlyShowsAccessibleProjects() throws Exception {
 		String suffix = randomKey();
 		String second = "ZZ" + suffix.substring(0, 4);
 		String first = "AA" + suffix.substring(0, 4);
 		create("alice", second, "Second").andExpect(status().isFound());
-		create("bob", first, "First").andExpect(status().isFound());
+		create("alice", first, "First").andExpect(status().isFound());
 
-		String html = mvc.perform(get("/projects").with(user("carol")))
+		String html = mvc.perform(get("/projects").with(user("alice")))
 				.andExpect(status().isOk())
 				.andReturn().getResponse().getContentAsString();
 		assertThat(html).contains(first, second, "First", "Second");
 		assertThat(html.indexOf(">" + first + "<")).isLessThan(html.indexOf(">" + second + "<"));
+		mvc.perform(get("/projects").with(user("carol"))).andExpect(status().isOk())
+				.andExpect(content().string(org.hamcrest.Matchers.not(containsString(second))));
 	}
 
 	@Test
@@ -195,5 +199,23 @@ class ProjectsTests extends AbstractIntegrationTest {
 			assertThat(restarted.getBean(ProjectsApi.class).findByKey(key)).isPresent()
 					.get().extracting(ProjectRef::name).isEqualTo("Durable");
 		}
+	}
+
+	@Test
+	void ownerCannotBeForgedAndUnknownKeysHideExistingProjects() throws Exception {
+		String key = randomKey();
+		long alice = jdbc.queryForObject("select id from app_user where username='alice'", Long.class);
+		long bob = jdbc.queryForObject("select id from app_user where username='bob'", Long.class);
+		mvc.perform(post("/projects").with(user("alice")).with(csrf()).param("key", key)
+				.param("name", "Owned").param("owner", String.valueOf(bob)).param("createdBy", String.valueOf(bob)))
+				.andExpect(status().isFound());
+		assertThat(jdbc.queryForObject("select created_by from project where key=?", Long.class, key)).isEqualTo(alice);
+		assertThat(projects.findAccessible(key, alice)).get().extracting(ProjectAccess::role).isEqualTo(ProjectAccess.Role.OWNER);
+		assertThat(projects.findAccessible(key, bob)).isEmpty();
+		String unknown = mvc.perform(get("/projects/NOPE").with(user("bob")).header("HX-Request", "true"))
+				.andReturn().getResponse().getContentAsString();
+		mvc.perform(get("/projects/" + key).with(user("bob")).header("HX-Request", "true"))
+				.andExpect(status().isNotFound())
+				.andExpect(content().string(unknown));
 	}
 }

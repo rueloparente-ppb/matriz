@@ -8,7 +8,7 @@
   <section id="sprints" th:fragment="sprints">
     <h2 class="h4">Sprints</h2>
     <div th:if="${error != null}" class="alert alert-danger" role="alert" th:text="${error}">Error</div>
-    <form method="post" th:action="@{/projects/{key}/sprints(key=${project.key})}"
+    <form th:if="${projectRole == 'OWNER'}" method="post" th:action="@{/projects/{key}/sprints(key=${project.key})}"
           th:hx-post="@{/projects/{key}/sprints(key=${project.key})}" hx-target="#sprints">
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
       <label for="sprint-name">Name</label>
@@ -23,13 +23,13 @@
           <td><span class="badge" th:attr="data-value=${sprint.state}" th:text="${sprint.state}">PLANNED</span></td>
           <td th:text="${sprint.issueCount}">0</td>
           <td>
-            <form th:if="${sprint.state == 'PLANNED'}" method="post"
+            <form th:if="${projectRole == 'OWNER' and sprint.state == 'PLANNED'}" method="post"
                   th:action="@{/projects/{key}/sprints/{id}/start(key=${project.key},id=${sprint.id})}"
                   th:hx-post="@{/projects/{key}/sprints/{id}/start(key=${project.key},id=${sprint.id})}" hx-target="#sprints">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
               <button type="submit" class="btn btn-outline-primary">Start</button>
             </form>
-            <form th:if="${sprint.state == 'ACTIVE'}" method="post"
+            <form th:if="${projectRole == 'OWNER' and sprint.state == 'ACTIVE'}" method="post"
                   th:action="@{/projects/{key}/sprints/{id}/complete(key=${project.key},id=${sprint.id})}"
                   th:hx-post="@{/projects/{key}/sprints/{id}/complete(key=${project.key},id=${sprint.id})}" hx-target="#sprints">
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">

@@ -40,7 +40,7 @@ class ProjectController {
 
 	@GetMapping("/projects")
 	String list(Model model) {
-		model.addAttribute("projects", projects.list());
+		model.addAttribute("projects", projects.listAccessible(identity.currentUser().orElseThrow().id()));
 		return "projects/list";
 	}
 
@@ -67,7 +67,8 @@ class ProjectController {
 
 	@GetMapping("/projects/{key}")
 	String show(@PathVariable String key) {
-		ProjectRef project = projects.findByKey(key).orElseThrow(() -> new NotFoundException("Project " + key));
+		ProjectRef project = projects.findAccessible(key, identity.currentUser().orElseThrow().id())
+				.orElseThrow(() -> new NotFoundException("Project " + key)).project();
 		return "redirect:/projects/" + project.key() + "/issues";
 	}
 }

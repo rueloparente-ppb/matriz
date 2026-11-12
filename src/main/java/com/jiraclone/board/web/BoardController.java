@@ -44,8 +44,11 @@ class BoardController {
 	}
 
 	@ModelAttribute("project")
-	ProjectRef project(@PathVariable String key) {
-		return projects.findByKey(key).orElseThrow(() -> new NotFoundException("Project " + key));
+	ProjectRef project(@PathVariable String key, Model model) {
+		var access = projects.findAccessible(key, identity.currentUser().orElseThrow().id())
+				.orElseThrow(() -> new NotFoundException("Project " + key));
+		model.addAttribute("projectRole", access.role().name());
+		return access.project();
 	}
 
 	@GetMapping("/projects/{key}/board")
@@ -76,6 +79,7 @@ class BoardController {
 		if (issues.findIssue(project.id(), number).isEmpty()) {
 			return rejected(project, sprint, model, fragment, HttpStatus.NOT_FOUND, "Issue not found");
 		}
+		projects.findAccessible(project.key(), identity.currentUser().orElseThrow().id()).orElseThrow().requireOwner();
 		IssueStatus next;
 		try {
 			next = IssueStatus.valueOf(status);
@@ -113,8 +117,8 @@ class BoardController {
 		}
 		for (IssueRef issue : issues.findByProject(project.id())) {
 			if (included != null && !included.contains(issue.id())) continue;
-			String assignee = issue.assigneeId().isPresent()
-					? users.get(issue.assigneeId().getAsLong()).displayName() : "Unassigned";
+			String assignee = issue.assigneeIds().isEmpty() ? "Unassigned" : issue.assigneeIds().stream()
+					.sorted().map(id -> users.get(id).displayName()).collect(Collectors.joining(", "));
 			columns.get(issue.status()).add(new BoardCard(issue, assignee));
 		}
 		model.addAttribute("columns", columns);

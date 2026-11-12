@@ -153,4 +153,9 @@ public class SprintService implements SprintsApi {
 	private Sprint find(long projectId, long id) {
 		return sprints.findByIdAndProjectId(id, projectId).orElseThrow(() -> new NotFoundException("Sprint " + id));
 	}
+
+	@Transactional(readOnly = true)
+	public void requireExists(long projectId, long id) {
+		find(projectId, id);
+	}
 }

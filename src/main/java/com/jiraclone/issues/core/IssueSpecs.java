@@ -23,8 +23,8 @@ final class IssueSpecs {
 			}
 			switch (filter.assignee()) {
 				case AssigneeFilter.Any any -> { }
-				case AssigneeFilter.Unassigned none -> predicates.add(cb.isNull(root.get("assigneeId")));
-				case AssigneeFilter.User user -> predicates.add(cb.equal(root.get("assigneeId"), user.id()));
+				case AssigneeFilter.Unassigned none -> predicates.add(cb.isEmpty(root.get("assigneeIds")));
+				case AssigneeFilter.User user -> predicates.add(cb.isMember(user.id(), root.get("assigneeIds")));
 			}
 			if (!filter.query().isEmpty()) {
 				String pattern = "%" + escapeLike(filter.query().toLowerCase(Locale.ROOT)) + "%";

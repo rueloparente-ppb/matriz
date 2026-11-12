@@ -31,7 +31,8 @@ class CommentController {
 
 	@ModelAttribute("project")
 	ProjectRef project(@PathVariable String key) {
-		return projects.findByKey(key).orElseThrow(() -> new NotFoundException("Project " + key));
+		return projects.findAccessible(key, identity.currentUser().orElseThrow().id())
+				.orElseThrow(() -> new NotFoundException("Project " + key)).project();
 	}
 
 	@GetMapping("/projects/{key}/issues/{number}/comments")

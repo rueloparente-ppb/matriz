@@ -33,8 +33,11 @@ class SprintController {
 	}
 
 	@ModelAttribute("project")
-	ProjectRef project(@PathVariable String key) {
-		return projects.findByKey(key).orElseThrow(() -> new NotFoundException("Project " + key));
+	ProjectRef project(@PathVariable String key, Model model) {
+		var access = projects.findAccessible(key, identity.currentUser().orElseThrow().id())
+				.orElseThrow(() -> new NotFoundException("Project " + key));
+		model.addAttribute("projectRole", access.role().name());
+		return access.project();
 	}
 
 	@GetMapping("/projects/{key}/sprints")
@@ -48,6 +51,7 @@ class SprintController {
 	@PostMapping("/projects/{key}/sprints")
 	Object create(@ModelAttribute("project") ProjectRef project, @RequestParam(defaultValue = "") String name,
 			@RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
+		owner(project);
 		model.addAttribute("name", name);
 		try {
 			if (!sprints.create(project.id(), name)) return error(project, model, hx, HttpStatus.UNPROCESSABLE_ENTITY, "Name already in use");
@@ -60,6 +64,8 @@ class SprintController {
 	@PostMapping("/projects/{key}/sprints/{id}/start")
 	Object start(@ModelAttribute("project") ProjectRef project, @PathVariable long id,
 			@RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
+		sprints.requireExists(project.id(), id);
+		owner(project);
 		if (!sprints.start(project.id(), id)) return error(project, model, hx, HttpStatus.CONFLICT, "Cannot start sprint");
 		return success(project, hx, model);
 	}
@@ -67,6 +73,8 @@ class SprintController {
 	@PostMapping("/projects/{key}/sprints/{id}/complete")
 	Object complete(@ModelAttribute("project") ProjectRef project, @PathVariable long id,
 			@RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
+		sprints.requireExists(project.id(), id);
+		owner(project);
 		if (!sprints.complete(project.id(), id, identity.currentUser().orElseThrow().id()))
 			return error(project, model, hx, HttpStatus.CONFLICT, "Cannot complete sprint");
 		return success(project, hx, model);
@@ -83,6 +91,7 @@ class SprintController {
 			@RequestParam(defaultValue = "") String sprint,
 			@RequestHeader(value = "HX-Request", required = false) String hx, Model model) {
 		issue(project, number);
+		owner(project);
 		try {
 			sprints.assign(project.id(), number, sprint, identity.currentUser().orElseThrow().id());
 		} catch (IllegalArgumentException ex) {
@@ -94,6 +103,10 @@ class SprintController {
 			return "redirect:/projects/" + project.key() + "/issues/" + number;
 		populatePicker(project, number, model);
 		return "sprints/picker :: picker";
+	}
+
+	private void owner(ProjectRef project) {
+		projects.findAccessible(project.key(), identity.currentUser().orElseThrow().id()).orElseThrow().requireOwner();
 	}
 
 	private IssueRef issue(ProjectRef project, int number) {

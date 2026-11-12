@@ -15,4 +15,9 @@ class GlobalExceptionHandler {
 		String view = HtmxAuthenticationEntryPoint.isHtmx(request) ? "common/not-found :: notFound" : "common/not-found";
 		return new ModelAndView(view, HttpStatus.NOT_FOUND);
 	}
+
+	@ExceptionHandler(ForbiddenException.class)
+	ModelAndView forbidden(ForbiddenException ex, HttpServletRequest request) {
+		return ErrorViews.forbidden(HtmxAuthenticationEntryPoint.isHtmx(request));
+	}
 }

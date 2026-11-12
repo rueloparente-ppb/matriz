@@ -19,7 +19,6 @@ public class IssueForm {
 	@Pattern(regexp = "LOW|MEDIUM|HIGH", message = "Invalid priority")
 	private String priority = "MEDIUM";
 
-	private String assigneeId = "";
 
 	public String getTitle() {
 		return title;
@@ -53,11 +52,4 @@ public class IssueForm {
 		this.priority = priority;
 	}
 
-	public String getAssigneeId() {
-		return assigneeId;
-	}
-
-	public void setAssigneeId(String assigneeId) {
-		this.assigneeId = assigneeId;
-	}
 }

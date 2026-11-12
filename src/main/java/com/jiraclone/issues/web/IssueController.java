@@ -14,9 +14,7 @@ import com.jiraclone.projects.ProjectsApi;
 import jakarta.validation.Valid;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Map;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -38,7 +36,7 @@ class IssueController {
 
 	private static final String LIST_VIEW = "issues/list";
 	private static final String FORM_VIEW = "issues/new";
-	private static final Set<String> EDITABLE = Set.of("title", "description", "type", "priority", "status", "assignee");
+	private static final Set<String> EDITABLE = Set.of("title", "description", "type", "priority", "status");
 	private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
 			.withZone(ZoneId.systemDefault());
 
@@ -54,8 +52,11 @@ class IssueController {
 
 	/** Resolved before binding and validation, so an unknown project is a 404 before anything else (precedence). */
 	@ModelAttribute("project")
-	ProjectRef project(@PathVariable String key) {
-		return projects.findByKey(key).orElseThrow(() -> new NotFoundException("Project " + key));
+	ProjectRef project(@PathVariable String key, Model model) {
+		var access = projects.findAccessible(key, identity.currentUser().orElseThrow().id())
+				.orElseThrow(() -> new NotFoundException("Project " + key));
+		model.addAttribute("projectRole", access.role().name());
+		return access.project();
 	}
 
 	@InitBinder("form")
@@ -87,7 +88,8 @@ class IssueController {
 	}
 
 	@GetMapping("/projects/{key}/issues/new")
-	String newForm(Model model) {
+	String newForm(@ModelAttribute("project") ProjectRef project, Model model) {
+		owner(project);
 		model.addAttribute("form", new IssueForm());
 		model.addAttribute("users", identity.listUsers());
 		return FORM_VIEW;
@@ -96,14 +98,14 @@ class IssueController {
 	@PostMapping("/projects/{key}/issues")
 	Object create(@ModelAttribute("project") ProjectRef project, @Valid @ModelAttribute("form") IssueForm form,
 			BindingResult errors, Model model) {
+		owner(project);
 		model.addAttribute("users", identity.listUsers());
-		OptionalLong assignee = parseAssignee(form.getAssigneeId(), errors);
 		if (errors.hasErrors()) {
 			return ErrorViews.unprocessable(FORM_VIEW);
 		}
 		long reporter = identity.currentUser().orElseThrow().id();
 		IssueDetail created = issues.create(project.id(), form.getTitle(), form.getDescription(),
-				IssueType.valueOf(form.getType()), IssuePriority.valueOf(form.getPriority()), assignee, reporter);
+				IssueType.valueOf(form.getType()), IssuePriority.valueOf(form.getPriority()), reporter);
 		return "redirect:/projects/" + project.key() + "/issues/" + created.number();
 	}
 
@@ -126,6 +128,7 @@ class IssueController {
 	String edit(@ModelAttribute("project") ProjectRef project, @PathVariable int number, @PathVariable String field,
 			Model model) {
 		IssueDetail issue = fieldModel(project, number, field, model);
+		owner(project);
 		model.addAttribute("value", fieldValue(issue, field));
 		return "issues/field :: edit";
 	}
@@ -134,6 +137,7 @@ class IssueController {
 	Object update(@ModelAttribute("project") ProjectRef project, @PathVariable int number, @PathVariable String field,
 			@RequestParam(defaultValue = "") String value, Model model) {
 		IssueDetail issue = fieldModel(project, number, field, model);
+		owner(project);
 		try {
 			IssueDetail updated = issues.updateField(project.id(), number, field, value, identity.currentUser().orElseThrow().id());
 			model.addAttribute("issue", toView(project, updated, userIndex()));
@@ -143,6 +147,10 @@ class IssueController {
 			model.addAttribute("error", ex.getMessage());
 			return ErrorViews.unprocessable("issues/field :: edit");
 		}
+	}
+
+	private void owner(ProjectRef project) {
+		projects.findAccessible(project.key(), identity.currentUser().orElseThrow().id()).orElseThrow().requireOwner();
 	}
 
 	private IssueDetail fieldModel(ProjectRef project, int number, String field, Model model) {
@@ -164,26 +172,8 @@ class IssueController {
 			case "type" -> issue.type().name();
 			case "priority" -> issue.priority().name();
 			case "status" -> issue.status().name();
-			case "assignee" -> issue.assigneeId().isPresent() ? String.valueOf(issue.assigneeId().getAsLong()) : "none";
 			default -> throw new NotFoundException("Issue field " + field);
 		};
-	}
-
-	/** Blank means unassigned; anything that is not an existing user id is a validation error (ISS-4). */
-	private OptionalLong parseAssignee(String raw, BindingResult errors) {
-		if (raw == null || raw.isBlank()) {
-			return OptionalLong.empty();
-		}
-		try {
-			long id = Long.parseLong(raw.trim());
-			if (identity.findUser(id).isPresent()) {
-				return OptionalLong.of(id);
-			}
-		} catch (NumberFormatException e) {
-			// falls through to the error below
-		}
-		errors.rejectValue("assigneeId", "assignee.unknown", "Unknown assignee");
-		return OptionalLong.empty();
 	}
 
 	private Map<Long, UserRef> userIndex() {
@@ -191,7 +181,8 @@ class IssueController {
 	}
 
 	private static IssueView toView(ProjectRef project, IssueDetail i, Map<Long, UserRef> users) {
-		String assignee = i.assigneeId().isPresent() ? name(users, i.assigneeId().getAsLong()) : "Unassigned";
+		String assignee = i.assigneeIds().isEmpty() ? "Unassigned" : i.assigneeIds().stream()
+				.sorted().map(id -> name(users, id)).collect(Collectors.joining(", "));
 		return new IssueView(project.key() + "-" + i.number(), i.number(), i.title(), i.description(),
 				i.type().name(), i.priority().name(), i.status().name(), assignee, name(users, i.reporterId()),
 				TIMESTAMP.format(i.createdAt()), TIMESTAMP.format(i.updatedAt()));

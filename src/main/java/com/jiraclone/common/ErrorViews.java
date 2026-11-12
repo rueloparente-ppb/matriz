@@ -16,4 +16,8 @@ public final class ErrorViews {
 	public static ModelAndView unprocessable(String view) {
 		return new ModelAndView(view, HttpStatus.UNPROCESSABLE_ENTITY);
 	}
+
+	public static ModelAndView forbidden(boolean htmx) {
+		return new ModelAndView(htmx ? "common/forbidden :: forbidden" : "common/forbidden", HttpStatus.FORBIDDEN);
+	}
 }

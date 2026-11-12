@@ -5,8 +5,8 @@
   <strong class="text-capitalize" th:if="${field == 'title' or field == 'description'}" th:text="${field}">Field</strong>
   <span th:class="${field == 'type' or field == 'priority' or field == 'status'} ? 'badge' : 'field-value'"
         th:attr="data-value=${field == 'type' or field == 'priority' or field == 'status' ? issue[field] : null}"
-        th:text="${field == 'assignee' ? issue.assigneeName : issue[field]}">Value</span>
-  <button type="button" class="btn btn-link btn-sm" th:hx-get="@{/projects/{key}/issues/{number}/{field}/edit(key=${project.key},number=${issue.number},field=${field})}"
+        th:text="${issue[field]}">Value</span>
+  <button th:if="${projectRole == 'OWNER'}" type="button" class="btn btn-link btn-sm" th:hx-get="@{/projects/{key}/issues/{number}/{field}/edit(key=${project.key},number=${issue.number},field=${field})}"
           hx-target="closest .issue-field" hx-swap="outerHTML" th:aria-label="|Edit ${field}|">Edit</button>
 </div>
 <div class="issue-field mb-2" th:fragment="edit" th:id="|issue-${field}|">
@@ -24,10 +24,6 @@
     </select>
     <select th:if="${field == 'status'}" name="value" th:id="|edit-${field}|" class="form-select">
       <option th:each="option : ${T(com.jiraclone.issues.IssueStatus).values()}" th:value="${option}" th:text="${option}" th:selected="${value == option.name()}"></option>
-    </select>
-    <select th:if="${field == 'assignee'}" name="value" th:id="|edit-${field}|" class="form-select">
-      <option value="none" th:selected="${value == 'none' or value == ''}">Unassigned</option>
-      <option th:each="person : ${users}" th:value="${person.id}" th:text="${person.displayName}" th:selected="${value == person.id.toString()}"></option>
     </select>
     <div class="text-danger" th:if="${error != null}" th:text="${error}">Error</div>
     <button type="submit" class="btn btn-primary btn-sm mt-1">Save</button>

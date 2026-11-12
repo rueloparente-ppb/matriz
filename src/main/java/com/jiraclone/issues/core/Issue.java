@@ -3,16 +3,21 @@ package com.jiraclone.issues.core;
 import com.jiraclone.issues.IssuePriority;
 import com.jiraclone.issues.IssueStatus;
 import com.jiraclone.issues.IssueType;
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "issue")
@@ -46,8 +51,10 @@ class Issue {
 	@Column(nullable = false)
 	private IssueStatus status;
 
-	@Column(name = "assignee_id")
-	private Long assigneeId;
+	@ElementCollection
+	@CollectionTable(name = "issue_assignee", joinColumns = @JoinColumn(name = "issue_id"))
+	@Column(name = "user_id", nullable = false)
+	private Set<Long> assigneeIds = new HashSet<>();
 
 	@Column(name = "reporter_id", nullable = false, updatable = false)
 	private long reporterId;
@@ -62,7 +69,7 @@ class Issue {
 	}
 
 	Issue(long projectId, int number, String title, String description, IssueType type, IssuePriority priority,
-			Long assigneeId, long reporterId) {
+			long reporterId) {
 		this.projectId = projectId;
 		this.number = number;
 		this.title = title;
@@ -70,7 +77,6 @@ class Issue {
 		this.type = type;
 		this.priority = priority;
 		this.status = IssueStatus.TO_DO;
-		this.assigneeId = assigneeId;
 		this.reporterId = reporterId;
 		this.createdAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
 		this.updatedAt = this.createdAt;
@@ -108,8 +114,8 @@ class Issue {
 		return status;
 	}
 
-	Long getAssigneeId() {
-		return assigneeId;
+	Set<Long> getAssigneeIds() {
+		return assigneeIds;
 	}
 
 	long getReporterId() {
@@ -129,7 +135,6 @@ class Issue {
 	void setType(IssueType type) { this.type = type; }
 	void setPriority(IssuePriority priority) { this.priority = priority; }
 	void setStatus(IssueStatus status) { this.status = status; }
-	void setAssigneeId(Long assigneeId) { this.assigneeId = assigneeId; }
 
 	void touch() {
 		Instant now = Instant.now().truncatedTo(ChronoUnit.MICROS);

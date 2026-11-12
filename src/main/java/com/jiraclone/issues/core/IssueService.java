@@ -1,7 +1,6 @@
 package com.jiraclone.issues.core;
 
 import com.jiraclone.common.NotFoundException;
-import com.jiraclone.identity.IdentityApi;
 import com.jiraclone.issues.IssueCreated;
 import com.jiraclone.issues.IssueFieldChanged;
 import com.jiraclone.issues.IssuePriority;
@@ -9,11 +8,12 @@ import com.jiraclone.issues.IssueRef;
 import com.jiraclone.issues.IssueStatus;
 import com.jiraclone.issues.IssueType;
 import com.jiraclone.issues.IssuesApi;
+import com.jiraclone.projects.ProjectMembership;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalLong;
+import java.util.Set;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -22,19 +22,17 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
-public class IssueService implements IssuesApi {
+public class IssueService implements IssuesApi, ProjectMembership {
 
 	public static final int PAGE_SIZE = 25;
 
 	private final IssueRepository issues;
 	private final IssueNumbering numbering;
-	private final IdentityApi identity;
 	private final ApplicationEventPublisher events;
 
-	IssueService(IssueRepository issues, IssueNumbering numbering, IdentityApi identity, ApplicationEventPublisher events) {
+	IssueService(IssueRepository issues, IssueNumbering numbering, ApplicationEventPublisher events) {
 		this.issues = issues;
 		this.numbering = numbering;
-		this.identity = identity;
 		this.events = events;
 	}
 
@@ -44,11 +42,10 @@ public class IssueService implements IssuesApi {
 	 */
 	@Transactional
 	public IssueDetail create(long projectId, String title, String description, IssueType type,
-			IssuePriority priority, OptionalLong assigneeId, long reporterId) {
+			IssuePriority priority, long reporterId) {
 		int number = numbering.next(projectId);
 		String storedDescription = description == null || description.isEmpty() ? null : description;
-		Issue issue = new Issue(projectId, number, title, storedDescription, type, priority,
-				assigneeId.isPresent() ? assigneeId.getAsLong() : null, reporterId);
+		Issue issue = new Issue(projectId, number, title, storedDescription, type, priority, reporterId);
 		IssueDetail created = toDetail(issues.saveAndFlush(issue));
 		events.publishEvent(new IssueCreated(created.id(), reporterId));
 		return created;
@@ -89,7 +86,7 @@ public class IssueService implements IssuesApi {
 	/** Validates and changes exactly one field; events run inside the same transaction. */
 	@Transactional
 	public IssueDetail updateField(long projectId, int number, String field, String raw, long actorId) {
-		if (!List.of("title", "description", "type", "priority", "status", "assignee").contains(field)) {
+		if (!List.of("title", "description", "type", "priority", "status").contains(field)) {
 			throw new NotFoundException("Issue field " + field);
 		}
 		Issue issue = issues.findByProjectIdAndNumber(projectId, number)
@@ -101,22 +98,20 @@ public class IssueService implements IssuesApi {
 			case "type" -> issue.getType();
 			case "priority" -> issue.getPriority();
 			case "status" -> issue.getStatus();
-			case "assignee" -> issue.getAssigneeId();
 			default -> throw new IllegalStateException();
 		};
 		if (!Objects.equals(previous, next)) {
-			String oldValue = display(field, previous);
+			String oldValue = display(previous);
 			switch (field) {
 				case "title" -> issue.setTitle((String) next);
 				case "description" -> issue.setDescription((String) next);
 				case "type" -> issue.setType((IssueType) next);
 				case "priority" -> issue.setPriority((IssuePriority) next);
 				case "status" -> issue.setStatus((IssueStatus) next);
-				case "assignee" -> issue.setAssigneeId((Long) next);
 				default -> throw new IllegalStateException();
 			}
 			issue.touch();
-			events.publishEvent(new IssueFieldChanged(issue.getId(), actorId, field, oldValue, display(field, next)));
+			events.publishEvent(new IssueFieldChanged(issue.getId(), actorId, field, oldValue, display(next)));
 		}
 		return toDetail(issue);
 	}
@@ -139,24 +134,8 @@ public class IssueService implements IssuesApi {
 			case "type" -> parseEnum(IssueType.class, raw, "type");
 			case "priority" -> parseEnum(IssuePriority.class, raw, "priority");
 			case "status" -> parseEnum(IssueStatus.class, raw, "status");
-			case "assignee" -> parseAssignee(raw);
 			default -> throw new NotFoundException("Issue field " + field);
 		};
-	}
-
-	private Long parseAssignee(String raw) {
-		if (raw.isBlank() || raw.equals("none")) {
-			return null;
-		}
-		try {
-			long id = Long.parseLong(raw.trim());
-			if (identity.findUser(id).isPresent()) {
-				return id;
-			}
-		} catch (NumberFormatException ignored) {
-			// Report the same validation error for malformed and unknown ids.
-		}
-		throw new InvalidIssueFieldException("Unknown assignee");
 	}
 
 	private static <T extends Enum<T>> T parseEnum(Class<T> type, String raw, String field) {
@@ -167,19 +146,16 @@ public class IssueService implements IssuesApi {
 		}
 	}
 
-	private String display(String field, Object value) {
+	private static String display(Object value) {
 		if (value == null || value.equals("")) {
 			return "None";
-		}
-		if (field.equals("assignee")) {
-			return identity.findUser((Long) value).orElseThrow().displayName();
 		}
 		return value.toString();
 	}
 
 	private static IssueRef toRef(Issue i) {
 		return new IssueRef(i.getId(), i.getProjectId(), i.getNumber(), i.getTitle(), i.getType(), i.getPriority(),
-				i.getStatus(), i.getAssigneeId() == null ? OptionalLong.empty() : OptionalLong.of(i.getAssigneeId()));
+				i.getStatus(), i.getAssigneeIds());
 	}
 
 	/** One page of a project's issues, number descending, {@value #PAGE_SIZE} per page; {@code page} is 1-based. */
@@ -193,7 +169,17 @@ public class IssueService implements IssuesApi {
 	private static IssueDetail toDetail(Issue i) {
 		return new IssueDetail(i.getId(), i.getProjectId(), i.getNumber(), i.getTitle(),
 				i.getDescription() == null ? "" : i.getDescription(), i.getType(), i.getPriority(), i.getStatus(),
-				i.getAssigneeId() == null ? OptionalLong.empty() : OptionalLong.of(i.getAssigneeId()),
+				i.getAssigneeIds(),
 				i.getReporterId(), i.getCreatedAt(), i.getUpdatedAt());
+	}
+
+	@Override
+	public boolean isMember(long projectId, long userId) {
+		return issues.isAssignee(projectId, userId);
+	}
+
+	@Override
+	public Set<Long> projectIds(long userId) {
+		return Set.copyOf(issues.projectIdsForAssignee(userId));
 	}
 }

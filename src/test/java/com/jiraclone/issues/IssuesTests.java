@@ -70,20 +70,25 @@ class IssuesTests extends AbstractIntegrationTest {
 		return jdbc.queryForObject("select id from app_user where lower(username) = ?", Long.class, username);
 	}
 
+	private void assign(String key, int number, String username) {
+		jdbc.update("insert into issue_assignee(issue_id,user_id) select i.id, ? from issue i "
+				+ "join project p on p.id=i.project_id where p.key=? and i.number=?", userId(username), key, number);
+	}
+
 	@Test
 	void iss1_iss2_validCreateRedirectsAndAppliesDefaults() throws Exception {
 		String key = newProject();
 		create("alice", key, "  First  ").andExpect(status().isFound())
 				.andExpect(redirectedUrl("/projects/" + key + "/issues/1"));
-		create("bob", key, "Second").andExpect(redirectedUrl("/projects/" + key + "/issues/2"));
+		create("alice", key, "Second").andExpect(redirectedUrl("/projects/" + key + "/issues/2"));
 
 		var row = jdbc.queryForMap("""
-				select i.title, i.description, i.type, i.priority, i.status, i.assignee_id, i.reporter_id
+				select i.title, i.description, i.type, i.priority, i.status, i.reporter_id
 				from issue i join project p on p.id = i.project_id where p.key = ? and i.number = 1
 				""", key);
 		assertThat(row).containsEntry("title", "First").containsEntry("type", "TASK")
 				.containsEntry("priority", "MEDIUM").containsEntry("status", "TO_DO")
-				.containsEntry("assignee_id", null).containsEntry("description", null)
+				.containsEntry("description", null)
 				.containsEntry("reporter_id", userId("alice"));
 	}
 
@@ -91,12 +96,12 @@ class IssuesTests extends AbstractIntegrationTest {
 	void iss1_explicitFieldsAreStored() throws Exception {
 		String key = newProject();
 		mvc.perform(createRequest("alice", key, "T").param("description", "D").param("type", "BUG")
-				.param("priority", "HIGH").param("assigneeId", String.valueOf(userId("bob"))))
+				.param("priority", "HIGH"))
 				.andExpect(status().isFound());
-		var row = jdbc.queryForMap("select type, priority, assignee_id, description from issue i "
+		var row = jdbc.queryForMap("select type, priority, description from issue i "
 				+ "join project p on p.id = i.project_id where p.key = ?", key);
 		assertThat(row).containsEntry("type", "BUG").containsEntry("priority", "HIGH")
-				.containsEntry("assignee_id", userId("bob")).containsEntry("description", "D");
+				.containsEntry("description", "D");
 	}
 
 	@Test
@@ -118,9 +123,7 @@ class IssuesTests extends AbstractIntegrationTest {
 		var bad = List.of(
 				createRequest("alice", key, "T").param("description", "x".repeat(5001)),
 				createRequest("alice", key, "T").param("type", "EPIC"),
-				createRequest("alice", key, "T").param("priority", "URGENT"),
-				createRequest("alice", key, "T").param("assigneeId", "999999999"),
-				createRequest("alice", key, "T").param("assigneeId", "abc"));
+				createRequest("alice", key, "T").param("priority", "URGENT"));
 		for (var request : bad) {
 			mvc.perform(request).andExpect(status().isUnprocessableEntity())
 					.andExpect(content().string(containsString("value=\"T\"")));
@@ -169,12 +172,14 @@ class IssuesTests extends AbstractIntegrationTest {
 	void iss7_detailShowsAllFields() throws Exception {
 		String key = newProject();
 		mvc.perform(createRequest("alice", key, "Fix login").param("description", "It breaks").param("type", "BUG")
-				.param("priority", "HIGH").param("assigneeId", String.valueOf(userId("bob"))))
+				.param("priority", "HIGH"))
 				.andExpect(status().isFound());
+		assign(key, 1, "bob");
+		assign(key, 1, "carol");
 
 		String html = mvc.perform(get("/projects/" + key + "/issues/1").with(user("carol")))
 				.andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-		assertThat(html).contains(key + "-1", "Fix login", "It breaks", "BUG", "HIGH", "TO_DO", "Bob", "Alice");
+		assertThat(html).contains(key + "-1", "Fix login", "It breaks", "BUG", "HIGH", "TO_DO", "Bob Brown", "Carol Clark", "Alice");
 		assertThat(html).containsPattern("Created</dt><dd[^>]*>\\d{4}-\\d{2}-\\d{2}");
 		assertThat(html).containsPattern("Updated</dt><dd[^>]*>\\d{4}-\\d{2}-\\d{2}");
 	}
@@ -220,7 +225,7 @@ class IssuesTests extends AbstractIntegrationTest {
 		mvc.perform(get("/projects/" + key + "/issues/new").with(user("alice"))).andExpect(status().isOk())
 				.andExpect(content().string(containsString("name=\"title\"")))
 				.andExpect(content().string(containsString("name=\"_csrf\"")))
-				.andExpect(content().string(containsString("Bob")));
+				.andExpect(content().string(containsString("name=\"_csrf\"")));
 	}
 
 	@Test
@@ -261,9 +266,11 @@ class IssuesTests extends AbstractIntegrationTest {
 	void iss10_filtersCombineWithAnd() throws Exception {
 		String key = newProject();
 		long bob = userId("bob");
-		mvc.perform(createRequest("alice", key, "Bug for bob").param("type", "BUG").param("assigneeId", "" + bob));
+		mvc.perform(createRequest("alice", key, "Bug for bob").param("type", "BUG"));
 		mvc.perform(createRequest("alice", key, "Bug nobody").param("type", "BUG"));
-		mvc.perform(createRequest("alice", key, "Task for bob").param("assigneeId", "" + bob));
+		mvc.perform(createRequest("alice", key, "Task for bob"));
+		assign(key, 1, "bob");
+		assign(key, 3, "bob");
 		jdbc.update("update issue set status = 'DONE' where title = 'Task for bob'");
 
 		list(key, "type", "BUG").andExpect(content().string(containsString("Bug for bob")))
@@ -333,7 +340,7 @@ class IssuesTests extends AbstractIntegrationTest {
 	}
 
 	private MockHttpServletRequestBuilder editRequest(String key, String field, String value) {
-		return post("/projects/" + key + "/issues/1/" + field).with(user("bob")).with(csrf())
+		return post("/projects/" + key + "/issues/1/" + field).with(user("alice")).with(csrf())
 				.header("HX-Request", "true").param("value", value);
 	}
 
@@ -348,22 +355,17 @@ class IssuesTests extends AbstractIntegrationTest {
 		create("alice", key, "First").andExpect(status().isFound());
 		Object before = updatedAt(key);
 		for (String[] change : new String[][] { { "title", " Second " }, { "description", "<b>hello</b>" },
-				{ "type", "BUG" }, { "priority", "HIGH" }, { "status", "DONE" },
-				{ "assignee", "" + userId("bob") } }) {
+				{ "type", "BUG" }, { "priority", "HIGH" }, { "status", "DONE" } }) {
 			mvc.perform(editRequest(key, change[0], change[1])).andExpect(status().isOk())
 					.andExpect(content().string(not(containsString("<html"))));
 		}
 		assertThat(updatedAt(key)).isNotEqualTo(before);
-		var row = jdbc.queryForMap("select i.title,i.description,i.type,i.priority,i.status,i.assignee_id "
+		var row = jdbc.queryForMap("select i.title,i.description,i.type,i.priority,i.status "
 				+ "from issue i join project p on p.id=i.project_id where p.key=?", key);
 		assertThat(row).containsEntry("title", "Second").containsEntry("description", "<b>hello</b>")
-				.containsEntry("type", "BUG").containsEntry("priority", "HIGH").containsEntry("status", "DONE")
-				.containsEntry("assignee_id", userId("bob"));
+				.containsEntry("type", "BUG").containsEntry("priority", "HIGH").containsEntry("status", "DONE");
 		assertThat(events.stream(IssueCreated.class)).hasSize(1);
-		assertThat(events.stream(IssueFieldChanged.class)).hasSize(6);
-		assertThat(events.stream(IssueFieldChanged.class).filter(e -> e.field().equals("assignee")))
-				.singleElement().satisfies(e -> assertThat(e.oldValue()).isEqualTo("None"))
-				.satisfies(e -> assertThat(e.newValue()).isEqualTo("Bob Brown"));
+		assertThat(events.stream(IssueFieldChanged.class)).hasSize(5);
 		mvc.perform(get("/projects/" + key + "/issues/1").with(user("alice"))).andExpect(status().isOk())
 				.andExpect(content().string(containsString("&lt;b&gt;hello&lt;/b&gt;")));
 	}
@@ -375,14 +377,13 @@ class IssuesTests extends AbstractIntegrationTest {
 		Object before = updatedAt(key);
 		for (String[] change : new String[][] { { "title", " " }, { "title", "a".repeat(201) },
 				{ "description", "a".repeat(5001) }, { "type", "EPIC" }, { "priority", "URGENT" },
-				{ "status", "BLOCKED" }, { "assignee", "999999" }, { "assignee", "abc" } }) {
+				{ "status", "BLOCKED" } }) {
 			mvc.perform(editRequest(key, change[0], change[1])).andExpect(status().isUnprocessableEntity())
 					.andExpect(content().string(containsString("text-danger")))
 					.andExpect(content().string(containsString("name=\"value\"")));
 		}
 		for (String[] same : new String[][] { { "title", " First " }, { "description", "" },
-				{ "type", "TASK" }, { "priority", "MEDIUM" }, { "status", "TO_DO" },
-				{ "assignee", "none" }, { "assignee", "" } }) {
+				{ "type", "TASK" }, { "priority", "MEDIUM" }, { "status", "TO_DO" } }) {
 			mvc.perform(editRequest(key, same[0], same[1])).andExpect(status().isOk());
 		}
 		assertThat(updatedAt(key)).isEqualTo(before);
@@ -390,21 +391,14 @@ class IssuesTests extends AbstractIntegrationTest {
 	}
 
 	@Test
-	void iss18_iss19_protectedAndUnknownFields404AndAssigneeClears() throws Exception {
+	void iss18_iss19_protectedAndUnknownFields404() throws Exception {
 		String key = newProject();
 		create("alice", key, "First").andExpect(status().isFound());
-		for (String field : List.of("unknown", "key", "number", "reporter", "createdAt", "updatedAt")) {
+		for (String field : List.of("unknown", "key", "number", "reporter", "createdAt", "updatedAt", "assignee")) {
 			mvc.perform(editRequest(key, field, "evil")).andExpect(status().isNotFound());
 		}
 		mvc.perform(editRequest("NOPE", "title", "bad")).andExpect(status().isNotFound());
-		mvc.perform(editRequest(key, "assignee", "" + userId("bob"))).andExpect(status().isOk());
-		mvc.perform(editRequest(key, "assignee", "none")).andExpect(status().isOk())
-				.andExpect(content().string(containsString("Unassigned")));
-		mvc.perform(editRequest(key, "assignee", "" + userId("bob"))).andExpect(status().isOk());
-		mvc.perform(editRequest(key, "assignee", "")).andExpect(status().isOk());
-		assertThat(jdbc.queryForObject("select assignee_id from issue i join project p on p.id=i.project_id "
-				+ "where p.key=?", Long.class, key)).isNull();
-		assertThat(events.stream(IssueFieldChanged.class)).hasSize(4);
+		assertThat(events.stream(IssueFieldChanged.class)).isEmpty();
 	}
 
 	@Test

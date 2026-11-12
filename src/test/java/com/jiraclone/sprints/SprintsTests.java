@@ -50,7 +50,7 @@ class SprintsTests extends AbstractIntegrationTest {
 	}
 
 	private int action(String key, long id, String action) throws Exception {
-		return mvc.perform(post(url(key) + "/" + id + "/" + action).with(user("bob")).with(csrf()))
+		return mvc.perform(post(url(key) + "/" + id + "/" + action).with(user("alice")).with(csrf()))
 				.andReturn().getResponse().getStatus();
 	}
 
@@ -102,7 +102,7 @@ class SprintsTests extends AbstractIntegrationTest {
 		assertThat(state(first)).isEqualTo("COMPLETED");
 		assertThat(action(key, second, "start")).isEqualTo(302);
 		assertThat(state(second)).isEqualTo("ACTIVE");
-		mvc.perform(post(url(key) + "/" + second + "/complete").with(user("bob")).with(csrf())
+		mvc.perform(post(url(key) + "/" + second + "/complete").with(user("alice")).with(csrf())
 				.header("HX-Request", "true")).andExpect(status().isOk())
 				.andExpect(result -> assertThat(result.getResponse().getContentAsString()).doesNotContain("<html"));
 	}
@@ -162,7 +162,7 @@ class SprintsTests extends AbstractIntegrationTest {
 		assertThat(jdbc.queryForList("select kind from issue_history where issue_id=? order by id", String.class, done))
 				.containsExactly("CREATED", "FIELD_CHANGED");
 		assertThat(jdbc.queryForObject("select old_value || ':' || new_value || ':' || actor_name from issue_history "
-				+ "where issue_id=? and kind='SPRINT_CHANGED'", String.class, todo)).isEqualTo("Sprint A:None:Bob Brown");
+				+ "where issue_id=? and kind='SPRINT_CHANGED'", String.class, todo)).isEqualTo("Sprint A:None:Alice Anderson");
 		assertThat(jdbc.queryForObject("select i.updated_at > h.created_at from issue i join issue_history h "
 				+ "on h.issue_id=i.id and h.kind='CREATED' where i.id=?", Boolean.class, todo)).isTrue();
 		assertThat(mvc.perform(get("/projects/" + key + "/issues/1/history").with(user("alice")))
@@ -205,22 +205,22 @@ class SprintsTests extends AbstractIntegrationTest {
 				.andExpect(status().isFound());
 		assertThat(jdbc.queryForObject("select sprint_id from sprint_issue where issue_id=?", Long.class, issue)).isEqualTo(one);
 		var timestamp = jdbc.queryForObject("select updated_at from issue where id=?", java.time.OffsetDateTime.class, issue);
-		mvc.perform(post(endpoint).with(user("bob")).with(csrf()).param("sprint", String.valueOf(one)))
+		mvc.perform(post(endpoint).with(user("alice")).with(csrf()).param("sprint", String.valueOf(one)))
 				.andExpect(status().isFound());
 		assertThat(jdbc.queryForObject("select updated_at from issue where id=?", java.time.OffsetDateTime.class, issue)).isEqualTo(timestamp);
 		assertThat(action(key, closed, "start")).isEqualTo(302);
 		assertThat(action(key, closed, "complete")).isEqualTo(302);
 		for (String invalid : List.of(String.valueOf(closed), "garbage", "0")) {
-			mvc.perform(post(endpoint).with(user("bob")).with(csrf()).param("sprint", invalid))
+			mvc.perform(post(endpoint).with(user("alice")).with(csrf()).param("sprint", invalid))
 					.andExpect(status().isUnprocessableEntity());
 		}
-		mvc.perform(post(endpoint).with(user("bob")).with(csrf()).param("sprint", String.valueOf(foreign)))
+		mvc.perform(post(endpoint).with(user("alice")).with(csrf()).param("sprint", String.valueOf(foreign)))
 				.andExpect(status().isNotFound());
-		mvc.perform(post(endpoint).with(user("bob")).with(csrf()).param("sprint", String.valueOf(two))
+		mvc.perform(post(endpoint).with(user("alice")).with(csrf()).param("sprint", String.valueOf(two))
 				.header("HX-Request", "true")).andExpect(status().isOk())
 				.andExpect(result -> assertThat(result.getResponse().getContentAsString()).contains("id=\"issue-sprint\""));
 		assertThat(jdbc.queryForList("select sprint_id from sprint_issue where issue_id=?", Long.class, issue)).containsExactly(two);
-		mvc.perform(post(endpoint).with(user("bob")).with(csrf()).param("sprint", ""))
+		mvc.perform(post(endpoint).with(user("alice")).with(csrf()).param("sprint", ""))
 				.andExpect(status().isFound());
 		assertThat(jdbc.queryForList("select sprint_id from sprint_issue where issue_id=?", Long.class, issue)).isEmpty();
 		assertThat(jdbc.queryForList("select old_value || ':' || new_value from issue_history "
@@ -255,7 +255,7 @@ class SprintsTests extends AbstractIntegrationTest {
 				.andExpect(result -> assertThat(result.getResponse().getContentAsString()).doesNotContain("<span>No sprint</span>", "<span>In sprint</span>"));
 		mvc.perform(get(board).with(user("alice")).param("sprint", String.valueOf(foreign)))
 				.andExpect(status().isNotFound());
-		mvc.perform(post(board + "/move").with(user("bob")).with(csrf()).header("HX-Request", "true")
+		mvc.perform(post(board + "/move").with(user("alice")).with(csrf()).header("HX-Request", "true")
 				.param("issue", "1").param("status", "DONE").param("sprint", String.valueOf(selected)))
 				.andExpect(status().isOk()).andExpect(result -> assertThat(result.getResponse().getContentAsString())
 						.contains("<span>In sprint</span>", "selected=\"selected\"").doesNotContain("<span>No sprint</span>", "<html"));

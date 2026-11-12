@@ -50,4 +50,8 @@ class Project {
 	String getName() {
 		return name;
 	}
+
+	long getCreatedBy() {
+		return createdBy;
+	}
 }

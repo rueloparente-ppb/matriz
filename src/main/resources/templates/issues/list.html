@@ -41,7 +41,7 @@
     <th:block th:unless="${!#lists.isEmpty(errors)}">
       <p th:if="${#lists.isEmpty(issues)}" class="empty-state">No issues found.</p>
       <table class="table" th:unless="${#lists.isEmpty(issues)}">
-        <thead><tr><th>Key</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assignee</th></tr></thead>
+        <thead><tr><th>Key</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assignees</th></tr></thead>
         <tbody>
           <tr th:each="i : ${issues}">
             <td><a th:href="@{/projects/{key}/issues/{n}(key=${project.key},n=${i.number})}" th:text="${i.key}">PROJ-1</a></td>

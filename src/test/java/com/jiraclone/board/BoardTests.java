@@ -70,15 +70,20 @@ class BoardTests extends AbstractIntegrationTest {
 		long bob = jdbc.queryForObject("select id from app_user where username='bob'", Long.class);
 		mvc.perform(post("/projects/" + key + "/issues").with(user("alice")).with(csrf())
 				.param("title", "Third <script>alert(1)</script>").param("type", "BUG")
-				.param("priority", "HIGH").param("assigneeId", String.valueOf(bob)))
+				.param("priority", "HIGH"))
 				.andExpect(status().isFound());
+		jdbc.update("insert into issue_assignee(issue_id,user_id) select i.id, ? from issue i "
+				+ "join project p on p.id=i.project_id where p.key=? and i.number=3", bob, key);
+		long carol = jdbc.queryForObject("select id from app_user where username='carol'", Long.class);
+		jdbc.update("insert into issue_assignee(issue_id,user_id) select i.id, ? from issue i "
+				+ "join project p on p.id=i.project_id where p.key=? and i.number=3", carol, key);
 		issue(other, "Foreign");
 		jdbc.update("update issue set status='IN_PROGRESS' where title='Second' and project_id="
 				+ "(select id from project where key=?)", key);
 		String html = mvc.perform(get(path(key)).with(user("alice"))).andExpect(status().isOk())
 				.andReturn().getResponse().getContentAsString();
 		assertThat(html).contains("<html", "To Do (2)", "In Progress (1)", "Done (0)",
-				"First", "Third", "BUG", "HIGH", "Bob Brown", "Unassigned", "/projects/" + key + "/issues/1",
+				"First", "Third", "BUG", "HIGH", "Bob Brown", "Carol Clark", "Unassigned", "/projects/" + key + "/issues/1",
 				"&lt;script&gt;alert(1)&lt;/script&gt;")
 				.doesNotContain("Foreign", "<script>alert(1)</script>")
 				.containsPattern("(?s)data-status=\"TO_DO\".*?data-issue=\"1\".*?data-issue=\"3\".*?data-status=\"IN_PROGRESS\".*?data-issue=\"2\".*?data-status=\"DONE\"");

@@ -57,6 +57,11 @@ class CommentsTests extends AbstractIntegrationTest {
 		return "/projects/" + key + "/issues/1/comments";
 	}
 
+	private void assignBob(String key) {
+		jdbc.update("insert into issue_assignee(issue_id,user_id) select i.id, u.id from issue i "
+				+ "join project p on p.id=i.project_id cross join app_user u where p.key=? and u.username='bob'", key);
+	}
+
 	private MockHttpServletRequestBuilder add(String key, String body) {
 		return post(path(key)).with(user("bob")).with(csrf()).header("HX-Request", "true").param("body", body);
 	}
@@ -69,6 +74,7 @@ class CommentsTests extends AbstractIntegrationTest {
 	@Test
 	void cmt1_cmt6_cmt8_authorAndTimeComeFromServerWithoutTouchingIssue() throws Exception {
 		String key = projectWithIssue();
+		assignBob(key);
 		OffsetDateTime before = jdbc.queryForObject("select updated_at from issue i join project p on p.id=i.project_id "
 				+ "where p.key=?", OffsetDateTime.class, key);
 		mvc.perform(add(key, "  Hello  ").param("authorId", "99999").param("createdAt", "1990-01-01"))
@@ -92,6 +98,8 @@ class CommentsTests extends AbstractIntegrationTest {
 	void cmt2_oldestFirstWithIdentityTieBreakAndProjectScope() throws Exception {
 		String key = projectWithIssue();
 		String other = projectWithIssue();
+		assignBob(key);
+		assignBob(other);
 		mvc.perform(add(key, "First")).andExpect(status().isOk());
 		mvc.perform(add(key, "Second")).andExpect(status().isOk());
 		mvc.perform(add(key, "Earlier")).andExpect(status().isOk());
@@ -112,6 +120,7 @@ class CommentsTests extends AbstractIntegrationTest {
 	@Test
 	void cmt3_cmt4_invalidBodiesReturn422WithTypedTextAndNoInsert() throws Exception {
 		String key = projectWithIssue();
+		assignBob(key);
 		for (String body : List.of("", "   \n  ", "x".repeat(2001))) {
 			mvc.perform(add(key, body)).andExpect(status().isUnprocessableEntity())
 					.andExpect(content().string(containsString("Comment must be 1–2000 characters")))
@@ -140,6 +149,7 @@ class CommentsTests extends AbstractIntegrationTest {
 	@Test
 	void cmt7_escapedTextRetainsLineBreaksAndDetailLoadsFragment() throws Exception {
 		String key = projectWithIssue();
+		assignBob(key);
 		mvc.perform(add(key, "<script>alert(1)</script>\nNext line")).andExpect(status().isOk());
 		mvc.perform(get(path(key)).with(user("alice"))).andExpect(status().isOk())
 				.andExpect(content().string(containsString("&lt;script&gt;alert(1)&lt;/script&gt;\nNext line")))
@@ -167,6 +177,7 @@ class CommentsTests extends AbstractIntegrationTest {
 	@Test
 	void cmt9_commentsSurviveApplicationRestart() throws Exception {
 		String key = projectWithIssue();
+		assignBob(key);
 		mvc.perform(add(key, "Persisted")).andExpect(status().isOk());
 		HikariDataSource ds = dataSource.unwrap(HikariDataSource.class);
 		try (ConfigurableApplicationContext restarted = new SpringApplicationBuilder(JiraCloneApplication.class)

@@ -6,4 +6,6 @@ import java.util.Optional;
 public interface ProjectsApi {
 
 	Optional<ProjectRef> findByKey(String key);
+
+	Optional<ProjectAccess> findAccessible(String key, long userId);
 }

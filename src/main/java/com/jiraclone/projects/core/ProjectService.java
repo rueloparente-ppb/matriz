@@ -1,9 +1,12 @@
 package com.jiraclone.projects.core;
 
+import com.jiraclone.projects.ProjectAccess;
+import com.jiraclone.projects.ProjectMembership;
 import com.jiraclone.projects.ProjectRef;
 import com.jiraclone.projects.ProjectsApi;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 
@@ -11,9 +14,11 @@ import org.springframework.stereotype.Service;
 public class ProjectService implements ProjectsApi {
 
 	private final ProjectRepository projects;
+	private final ObjectProvider<ProjectMembership> membership;
 
-	ProjectService(ProjectRepository projects) {
+	ProjectService(ProjectRepository projects, ObjectProvider<ProjectMembership> membership) {
 		this.projects = projects;
+		this.membership = membership;
 	}
 
 	/**
@@ -37,9 +42,27 @@ public class ProjectService implements ProjectsApi {
 		return projects.findByKey(key).map(ProjectService::toRef);
 	}
 
+	@Override
+	public Optional<ProjectAccess> findAccessible(String key, long userId) {
+		return projects.findByKey(key).flatMap(p -> {
+			if (p.getCreatedBy() == userId) {
+				return Optional.of(new ProjectAccess(toRef(p), ProjectAccess.Role.OWNER));
+			}
+			return membership.getObject().isMember(p.getId(), userId)
+					? Optional.of(new ProjectAccess(toRef(p), ProjectAccess.Role.MEMBER)) : Optional.empty();
+		});
+	}
+
 	/** All projects, sorted by key ascending. */
 	public List<ProjectRef> list() {
 		return projects.findAllByOrderByKeyAsc().stream().map(ProjectService::toRef).toList();
+	}
+
+	public List<ProjectRef> listAccessible(long userId) {
+		var ids = membership.getObject().projectIds(userId);
+		return projects.findAllByOrderByKeyAsc().stream()
+				.filter(p -> p.getCreatedBy() == userId || ids.contains(p.getId()))
+				.map(ProjectService::toRef).toList();
 	}
 
 	private static ProjectRef toRef(Project p) {
