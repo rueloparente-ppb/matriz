@@ -12,7 +12,7 @@
     <dt class="col-sm-2">Type</dt><dd class="col-sm-10"><div th:replace="~{issues/field :: view('type')}"></div></dd>
     <dt class="col-sm-2">Priority</dt><dd class="col-sm-10"><div th:replace="~{issues/field :: view('priority')}"></div></dd>
     <dt class="col-sm-2">Status</dt><dd class="col-sm-10"><div th:replace="~{issues/field :: view('status')}"></div></dd>
-    <dt class="col-sm-2">Assignees</dt><dd class="col-sm-10" th:text="${issue.assigneeName}">Unassigned</dd>
+    <dt class="col-sm-2">Assignees</dt><dd class="col-sm-10"><div th:if="${projectRole == 'OWNER'}" th:replace="~{issues/assignees :: assignees}"></div><span th:unless="${projectRole == 'OWNER'}" th:text="${issue.assigneeName}">Unassigned</span></dd>
     <dt class="col-sm-2">Reporter</dt><dd class="col-sm-10" th:text="${issue.reporterName}">Alice</dd>
     <dt class="col-sm-2">Created</dt><dd class="col-sm-10" th:text="${issue.createdAt}">2026-01-01</dd>
     <dt class="col-sm-2">Updated</dt><dd class="col-sm-10" th:text="${issue.updatedAt}">2026-01-01</dd>

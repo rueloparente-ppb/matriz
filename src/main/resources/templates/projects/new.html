@@ -16,6 +16,11 @@
       <input id="name" th:field="*{name}" class="form-control" th:classappend="${#fields.hasErrors('name')} ? 'is-invalid'">
       <div class="invalid-feedback" th:errors="*{name}">Name error</div>
     </div>
+    <div class="mb-3">
+      <label for="description" class="form-label">Description</label>
+      <textarea id="description" th:field="*{description}" class="form-control" th:classappend="${#fields.hasErrors('description')} ? 'is-invalid'"></textarea>
+      <div class="invalid-feedback" th:errors="*{description}">Description error</div>
+    </div>
     <button type="submit" class="btn btn-primary">Create</button>
     <a class="btn btn-link" th:href="@{/projects}">Cancel</a>
   </form>

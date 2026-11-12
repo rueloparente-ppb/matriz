@@ -2,10 +2,12 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <body>
 <div th:fragment="nav(project)" class="d-flex justify-content-between align-items-center mb-3">
-  <h1 class="h3 m-0" th:text="${project.key} + ' · ' + ${project.name}">PROJ · Name</h1>
+  <div><h1 class="h3 m-0" th:text="${project.key} + ' · ' + ${project.name}">PROJ · Name</h1>
+    <p th:if="${!#strings.isEmpty(project.description)}" th:text="${project.description}">Description</p></div>
   <div>
     <a class="btn btn-outline-secondary" th:href="@{/projects/{key}/issues(key=${project.key})}">List</a>
     <a class="btn btn-outline-secondary" th:href="@{/projects/{key}/board(key=${project.key})}">Board</a>
+    <a th:if="${projectRole == 'OWNER'}" class="btn btn-outline-secondary" th:href="@{/projects/{key}/edit(key=${project.key})}">Edit project</a>
     <a class="btn btn-outline-secondary" th:href="@{/projects/{key}/sprints(key=${project.key})}">Sprints</a>
     <a th:if="${projectRole == 'OWNER'}" class="btn btn-primary" th:href="@{/projects/{key}/issues/new(key=${project.key})}">New issue</a>
   </div>

@@ -20,8 +20,11 @@ class Project {
 	@Column(name = "key", nullable = false, updatable = false)
 	private String key;
 
-	@Column(nullable = false, updatable = false)
+	@Column(nullable = false)
 	private String name;
+
+	@Column(length = 1000)
+	private String description;
 
 	@Column(name = "created_by", nullable = false, updatable = false)
 	private Long createdBy;
@@ -49,6 +52,15 @@ class Project {
 
 	String getName() {
 		return name;
+	}
+
+	String getDescription() {
+		return description;
+	}
+
+	void edit(String name, String description) {
+		this.name = name;
+		this.description = description;
 	}
 
 	long getCreatedBy() {

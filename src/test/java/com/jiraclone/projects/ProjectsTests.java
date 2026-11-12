@@ -105,11 +105,76 @@ class ProjectsTests extends AbstractIntegrationTest {
 		String key = randomKey();
 		create("alice", key, "   ").andExpect(status().isUnprocessableEntity())
 				.andExpect(content().string(containsString("Name is required")));
+		create("alice", key, "  ab  ").andExpect(status().isUnprocessableEntity())
+				.andExpect(content().string(containsString("3 to 100")));
 		create("alice", key, "x".repeat(101)).andExpect(status().isUnprocessableEntity())
-				.andExpect(content().string(containsString("at most 100")));
+				.andExpect(content().string(containsString("3 to 100")));
 		assertThat(count(key)).isZero();
 
 		create("alice", key, "x".repeat(100)).andExpect(status().isFound());
+	}
+
+	@Test
+	void editStoresDescriptionAndNameButNotSubmittedKey() throws Exception {
+		String key = randomKey();
+		create("alice", key, "Original").andExpect(status().isFound());
+		mvc.perform(get("/projects/" + key + "/edit").with(user("alice"))).andExpect(status().isOk())
+				.andExpect(content().string(containsString("Original")));
+		mvc.perform(post("/projects/" + key).with(user("alice")).with(csrf())
+				.param("name", "  Renamed  ").param("description", "Project details").param("key", "FORGED"))
+				.andExpect(status().isFound()).andExpect(redirectedUrl("/projects/" + key));
+		assertThat(jdbc.queryForMap("select key,name,description from project where key=?", key))
+				.containsEntry("key", key).containsEntry("name", "Renamed").containsEntry("description", "Project details");
+		mvc.perform(get("/projects/" + key + "/edit").with(user("alice"))).andExpect(status().isOk())
+				.andExpect(content().string(containsString("Project details")));
+		mvc.perform(get("/projects/" + key + "/issues").with(user("alice"))).andExpect(status().isOk())
+				.andExpect(content().string(containsString("Renamed")))
+				.andExpect(content().string(containsString("Project details")));
+	}
+
+	@Test
+	void createAndEditRejectInvalidFieldsWithoutChangingStoredValues() throws Exception {
+		String key = randomKey();
+		mvc.perform(post("/projects").with(user("alice")).with(csrf()).param("key", key)
+				.param("name", "Valid").param("description", "x".repeat(1001)))
+				.andExpect(status().isUnprocessableEntity()).andExpect(content().string(containsString("at most 1000")));
+		assertThat(count(key)).isZero();
+		create("alice", key, "Original").andExpect(status().isFound());
+		for (String bad : List.of("  ", " ab ", "x".repeat(101))) {
+			mvc.perform(post("/projects/" + key).with(user("alice")).with(csrf())
+					.param("name", bad).param("description", "Preserved"))
+					.andExpect(status().isUnprocessableEntity())
+					.andExpect(content().string(containsString("Preserved")));
+		}
+		mvc.perform(post("/projects/" + key).with(user("alice")).with(csrf())
+				.param("name", "Changed").param("description", "x".repeat(1001)))
+				.andExpect(status().isUnprocessableEntity());
+		assertThat(jdbc.queryForObject("select name from project where key=?", String.class, key)).isEqualTo("Original");
+		mvc.perform(post("/projects/" + key).with(user("alice")).with(csrf())
+				.param("name", "Changed").param("description", "x".repeat(1000)))
+				.andExpect(status().isFound());
+	}
+
+	@Test
+	void editIsOwnerOnlyAndCsrfProtected() throws Exception {
+		String key = randomKey();
+		create("alice", key, "Original").andExpect(status().isFound());
+		mvc.perform(post("/projects/" + key + "/issues").with(user("alice")).with(csrf())
+				.param("title", "For Bob")).andExpect(status().isFound());
+		long bob = jdbc.queryForObject("select id from app_user where username='bob'", Long.class);
+		jdbc.update("insert into issue_assignee(issue_id,user_id) select i.id, ? from issue i "
+				+ "join project p on p.id=i.project_id where p.key=?", bob, key);
+		for (String who : List.of("bob", "carol")) {
+			int expected = who.equals("bob") ? 403 : 404;
+			mvc.perform(get("/projects/" + key + "/edit").with(user(who)))
+				.andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(expected));
+			mvc.perform(post("/projects/" + key).with(user(who)).with(csrf())
+					.param("name", "Unauthorized"))
+				.andExpect(result -> assertThat(result.getResponse().getStatus()).isEqualTo(expected));
+		}
+		mvc.perform(post("/projects/" + key).with(user("alice")).param("name", "Unauthorized"))
+				.andExpect(status().isForbidden());
+		assertThat(jdbc.queryForObject("select name from project where key=?", String.class, key)).isEqualTo("Original");
 	}
 
 	@Test

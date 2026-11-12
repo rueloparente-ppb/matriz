@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout/base :: layout(~{::title}, ~{::main})}">
+<head><title>Assignees</title></head>
+<body><main class="container py-4">
+  <div id="issue-assignees" th:fragment="assignees">
+    <h3 class="h5">Assignees</h3>
+    <div th:if="${error != null}" class="alert alert-danger" th:text="${error}">Error</div>
+    <p th:if="${#lists.isEmpty(assigned)}">Unassigned</p>
+    <ul><li th:each="person : ${assigned}">
+      <span th:text="${person.displayName}">Person</span>
+      <form method="post" style="display:inline" th:action="@{/projects/{key}/issues/{number}/assignees/{id}/delete(key=${project.key},number=${number},id=${person.id})}"
+            th:hx-post="@{/projects/{key}/issues/{number}/assignees/{id}/delete(key=${project.key},number=${number},id=${person.id})}" hx-target="#issue-assignees" hx-swap="outerHTML">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button type="submit">Remove</button>
+      </form>
+    </li></ul>
+    <form method="post" th:action="@{/projects/{key}/issues/{number}/assignees(key=${project.key},number=${number})}"
+          th:hx-post="@{/projects/{key}/issues/{number}/assignees(key=${project.key},number=${number})}" hx-target="#issue-assignees" hx-swap="outerHTML">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <label for="assignee-user">Add assignee</label>
+      <input id="assignee-user" name="userId" th:value="${userId}" list="eligible-assignees">
+      <datalist id="eligible-assignees"><option th:each="person : ${eligible}" th:value="${person.id}" th:text="${person.displayName}">Person</option></datalist>
+      <button type="submit">Add</button>
+    </form>
+  </div>
+</main></body></html>

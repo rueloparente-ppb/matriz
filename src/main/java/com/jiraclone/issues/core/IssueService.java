@@ -15,6 +15,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -29,11 +30,35 @@ public class IssueService implements IssuesApi, ProjectMembership {
 	private final IssueRepository issues;
 	private final IssueNumbering numbering;
 	private final ApplicationEventPublisher events;
+	private final JdbcTemplate jdbc;
 
-	IssueService(IssueRepository issues, IssueNumbering numbering, ApplicationEventPublisher events) {
+	IssueService(IssueRepository issues, IssueNumbering numbering, ApplicationEventPublisher events, JdbcTemplate jdbc) {
 		this.issues = issues;
 		this.numbering = numbering;
 		this.events = events;
+		this.jdbc = jdbc;
+	}
+
+	@Transactional
+	public void addAssignee(long projectId, int number, long userId, long actorId, String userName) {
+		Issue issue = issues.findByProjectIdAndNumber(projectId, number)
+				.orElseThrow(() -> new NotFoundException("Issue " + number));
+		int added = jdbc.update("insert into issue_assignee (issue_id, user_id) values (?, ?) "
+				+ "on conflict on constraint issue_assignee_uq do nothing", issue.getId(), userId);
+		if (added == 0) throw new InvalidIssueFieldException("User is already assigned");
+		issue.touch();
+		events.publishEvent(new IssueFieldChanged(issue.getId(), actorId, "assignee", "None", userName));
+	}
+
+	@Transactional
+	public void removeAssignee(long projectId, int number, long userId, long actorId, String userName) {
+		Issue issue = issues.findByProjectIdAndNumber(projectId, number)
+				.orElseThrow(() -> new NotFoundException("Issue " + number));
+		if (jdbc.update("delete from issue_assignee where issue_id = ? and user_id = ?", issue.getId(), userId) == 0) {
+			throw new NotFoundException("Assignment " + userId);
+		}
+		issue.touch();
+		events.publishEvent(new IssueFieldChanged(issue.getId(), actorId, "assignee", userName, "None"));
 	}
 
 	/**

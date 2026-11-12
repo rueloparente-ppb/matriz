@@ -8,6 +8,7 @@ import com.jiraclone.projects.core.CreateProjectResult;
 import com.jiraclone.projects.core.ProjectService;
 import jakarta.validation.Valid;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -17,7 +18,7 @@ import org.springframework.web.bind.annotation.InitBinder;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.servlet.ModelAndView;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 @Controller
 class ProjectController {
@@ -33,7 +34,7 @@ class ProjectController {
 	}
 
 	/** Only the name is trimmed; the key is validated exactly as typed (PRJ-3). */
-	@InitBinder("form")
+	@InitBinder({"form", "editForm"})
 	void initBinder(WebDataBinder binder) {
 		binder.registerCustomEditor(String.class, "name", new StringTrimmerEditor(false));
 	}
@@ -56,13 +57,44 @@ class ProjectController {
 			return ErrorViews.unprocessable(FORM_VIEW);
 		}
 		long userId = identity.currentUser().orElseThrow().id();
-		return switch (projects.create(form.getKey(), form.getName(), userId)) {
+		return switch (projects.create(form.getKey(), form.getName(), form.getDescription(), userId)) {
 			case CreateProjectResult.Created created -> "redirect:/projects/" + created.project().key();
 			case CreateProjectResult.KeyInUse inUse -> {
 				errors.rejectValue("key", "key.inUse", "Key already in use");
 				yield ErrorViews.unprocessable(FORM_VIEW);
 			}
 		};
+	}
+
+	@GetMapping("/projects/{key}/edit")
+	String editForm(@PathVariable String key, Model model) {
+		ProjectRef project = owner(key);
+		ProjectEditForm form = new ProjectEditForm();
+		form.setName(project.name());
+		form.setDescription(project.description());
+		model.addAttribute("editForm", form);
+		model.addAttribute("key", key);
+		return "projects/edit";
+	}
+
+	@PostMapping("/projects/{key}")
+	Object edit(@PathVariable String key, @Valid @ModelAttribute("editForm") ProjectEditForm form,
+			BindingResult errors, Model model, @RequestHeader(value = "HX-Request", required = false) String hx) {
+		owner(key);
+		model.addAttribute("key", key);
+		if (errors.hasErrors()) return ErrorViews.unprocessable("projects/edit");
+		projects.edit(key, form.getName(), form.getDescription() == null ? "" : form.getDescription());
+		if ("true".equalsIgnoreCase(hx)) {
+			return ResponseEntity.ok().header("HX-Redirect", "/projects/" + key).build();
+		}
+		return "redirect:/projects/" + key;
+	}
+
+	private ProjectRef owner(String key) {
+		var access = projects.findAccessible(key, identity.currentUser().orElseThrow().id())
+				.orElseThrow(() -> new NotFoundException("Project " + key));
+		access.requireOwner();
+		return access.project();
 	}
 
 	@GetMapping("/projects/{key}")

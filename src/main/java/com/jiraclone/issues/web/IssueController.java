@@ -114,6 +114,11 @@ class IssueController {
 		IssueDetail issue = issues.find(project.id(), number)
 				.orElseThrow(() -> new NotFoundException("Issue " + project.key() + "-" + number));
 		model.addAttribute("issue", toView(project, issue, userIndex()));
+		if ("OWNER".equals(model.getAttribute("projectRole"))) {
+			model.addAttribute("number", number);
+			model.addAttribute("assigned", identity.listUsers().stream().filter(u -> issue.assigneeIds().contains(u.id())).toList());
+			model.addAttribute("eligible", identity.listUsers().stream().filter(u -> !issue.assigneeIds().contains(u.id())).toList());
+		}
 		return "issues/detail";
 	}
 

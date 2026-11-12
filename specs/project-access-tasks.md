@@ -96,10 +96,10 @@ Design proposals (**not confirmed — please confirm or change before approving*
 **Requirements:** ASG-1…ASG-6, ASG-8, ACC-9 (revocation)
 **Affected code:** `issues/web/IssueController` or new `AssigneeController`, `IssueService`, `IssueRepository`/new assignee repository, `IssueFieldChanged` (or a new assignee-changed event) and `history/core/HistoryRecorder`, `history/core/HistoryEntry` (kind/field check in `V6`), new assignees fragment template, `IdentityApi.listUsers`
 
-- [ ] 4.1 Endpoints: `GET/POST .../assignees`, `POST .../assignees/{userId}/delete`; eligible list = users not yet assigned, owner-only. Check: owner adds two users; both shown; member gets `403`; non-member `404`.
-- [ ] 4.2 Duplicate and invalid input: `422` for duplicate, nonexistent or non-numeric `userId`; `404` removing a non-assignee. Check: tests incl. two parallel identical adds → one row, one `422`, no `5xx` (ASG-3).
-- [ ] 4.3 History: each add/remove produces an entry with the acting user (ASG-8); check whether the `issue_history` `kind`/`field` constraints need a migration and add it if so. Check: history test.
-- [ ] 4.4 Revocation: removing the last assignment makes the former member get `404`; their comments remain (ACC-9). Check: test. Persistence after restart (ASG-7) is covered by the DB-backed test reloading the issue.
+- [x] 4.1 Endpoints: `GET/POST .../assignees`, `POST .../assignees/{userId}/delete`; eligible list = users not yet assigned, owner-only. Check: owner adds two users; both shown; member gets `403`; non-member `404`.
+- [x] 4.2 Duplicate and invalid input: `422` for duplicate, nonexistent or non-numeric `userId`; `404` removing a non-assignee. Check: tests incl. two parallel identical adds → one row, one `422`, no `5xx` (ASG-3).
+- [x] 4.3 History: each add/remove produces an entry with the acting user (ASG-8); check whether the `issue_history` `kind`/`field` constraints need a migration and add it if so. Check: history test.
+- [x] 4.4 Revocation: removing the last assignment makes the former member get `404`; their comments remain (ACC-9). Check: test. Persistence after restart (ASG-7) is covered by the DB-backed test reloading the issue.
 
 ### 5. Project editing
 
@@ -110,9 +110,9 @@ Design proposals (**not confirmed — please confirm or change before approving*
 **Requirements:** PRJ-E1…PRJ-E4
 **Affected code:** new `V9__project_description.sql`, `Project`, `ProjectService`, `ProjectController`, `ProjectForm`, `templates/projects/{new,edit}.html`, `ProjectRef`
 
-- [ ] 5.1 Add nullable `description` (≤1000) and `GET /projects/{key}/edit`, `POST /projects/{key}`. Check: valid edit redirects and shows stored values (PRJ-E1); `key` field ignored (PRJ-E4).
-- [ ] 5.2 Validation: name 3–100 after trimming, whitespace-only rejected, description ≤1000, applied to create and edit with input preserved. Check: `422` tests (PRJ-E2/E3) and that existing `ProjectsTests` name cases are updated.
-- [ ] 5.3 Member `POST` → `403`, non-member → `404`. Check: test.
+- [x] 5.1 Add nullable `description` (≤1000) and `GET /projects/{key}/edit`, `POST /projects/{key}`. Check: valid edit redirects and shows stored values (PRJ-E1); `key` field ignored (PRJ-E4).
+- [x] 5.2 Validation: name 3–100 after trimming, whitespace-only rejected, description ≤1000, applied to create and edit with input preserved. Check: `422` tests (PRJ-E2/E3) and that existing `ProjectsTests` name cases are updated.
+- [x] 5.3 Member `POST` → `403`, non-member → `404`. Check: test.
 
 ### 6. Issue deletion
 

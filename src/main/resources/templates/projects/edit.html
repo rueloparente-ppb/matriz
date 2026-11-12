@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:replace="~{layout/base :: layout(~{::title}, ~{::main})}">
+<head><title>Edit project</title></head>
+<body><main class="container py-4 form-page">
+  <h1 class="h3 mb-3">Edit project <span th:text="${key}">PROJ</span></h1>
+  <form method="post" th:action="@{/projects/{key}(key=${key})}" th:object="${editForm}" novalidate>
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    <div class="mb-3">
+      <label for="name" class="form-label">Name</label>
+      <input id="name" th:field="*{name}" class="form-control" th:classappend="${#fields.hasErrors('name')} ? 'is-invalid'">
+      <div class="invalid-feedback" th:errors="*{name}">Name error</div>
+    </div>
+    <div class="mb-3">
+      <label for="description" class="form-label">Description</label>
+      <textarea id="description" th:field="*{description}" class="form-control" th:classappend="${#fields.hasErrors('description')} ? 'is-invalid'"></textarea>
+      <div class="invalid-feedback" th:errors="*{description}">Description error</div>
+    </div>
+    <button class="btn btn-primary" type="submit">Save</button>
+    <a class="btn btn-link" th:href="@{/projects/{key}(key=${key})}">Cancel</a>
+  </form>
+</main></body></html>

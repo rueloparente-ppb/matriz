@@ -48,7 +48,7 @@ class IssuesTests extends AbstractIntegrationTest {
 			sb.append((char) ('A' + ThreadLocalRandom.current().nextInt(26)));
 		}
 		String key = sb.toString();
-		mvc.perform(post("/projects").with(user("alice")).with(csrf()).param("key", key).param("name", "P"))
+		mvc.perform(post("/projects").with(user("alice")).with(csrf()).param("key", key).param("name", "Project"))
 				.andExpect(status().isFound());
 		return key;
 	}
@@ -98,7 +98,7 @@ class IssuesTests extends AbstractIntegrationTest {
 		mvc.perform(createRequest("alice", key, "T").param("description", "D").param("type", "BUG")
 				.param("priority", "HIGH"))
 				.andExpect(status().isFound());
-		var row = jdbc.queryForMap("select type, priority, description from issue i "
+		var row = jdbc.queryForMap("select type, priority, i.description from issue i "
 				+ "join project p on p.id = i.project_id where p.key = ?", key);
 		assertThat(row).containsEntry("type", "BUG").containsEntry("priority", "HIGH")
 				.containsEntry("description", "D");

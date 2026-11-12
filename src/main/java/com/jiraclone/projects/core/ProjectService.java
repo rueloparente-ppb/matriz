@@ -1,5 +1,6 @@
 package com.jiraclone.projects.core;
 
+import com.jiraclone.common.NotFoundException;
 import com.jiraclone.projects.ProjectAccess;
 import com.jiraclone.projects.ProjectMembership;
 import com.jiraclone.projects.ProjectRef;
@@ -9,6 +10,7 @@ import java.util.Optional;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProjectService implements ProjectsApi {
@@ -26,9 +28,11 @@ public class ProjectService implements ProjectsApi {
 	 * violation can be handled here without a rollback-only outer transaction. The database constraint, not a
 	 * pre-check, decides concurrent creates with the same key (PRJ-6).
 	 */
-	public CreateProjectResult create(String key, String name, long createdBy) {
+	public CreateProjectResult create(String key, String name, String description, long createdBy) {
 		try {
-			return new CreateProjectResult.Created(toRef(projects.saveAndFlush(new Project(key, name, createdBy))));
+			Project project = new Project(key, name, createdBy);
+			project.edit(name, description == null || description.isEmpty() ? null : description);
+			return new CreateProjectResult.Created(toRef(projects.saveAndFlush(project)));
 		} catch (DataIntegrityViolationException e) {
 			if (projects.existsByKey(key)) {
 				return new CreateProjectResult.KeyInUse();
@@ -65,7 +69,13 @@ public class ProjectService implements ProjectsApi {
 				.map(ProjectService::toRef).toList();
 	}
 
+	@Transactional
+	public void edit(String key, String name, String description) {
+		Project project = projects.findByKey(key).orElseThrow(() -> new NotFoundException("Project " + key));
+		project.edit(name, description.isEmpty() ? null : description);
+	}
+
 	private static ProjectRef toRef(Project p) {
-		return new ProjectRef(p.getId(), p.getKey(), p.getName());
+		return new ProjectRef(p.getId(), p.getKey(), p.getName(), p.getDescription() == null ? "" : p.getDescription());
 	}
 }
