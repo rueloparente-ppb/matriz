@@ -39,16 +39,16 @@
   <div id="issue-results" th:fragment="results">
     <div th:each="e : ${errors}" class="alert alert-danger" role="alert" th:text="${e}">Error</div>
     <th:block th:unless="${!#lists.isEmpty(errors)}">
-      <p th:if="${#lists.isEmpty(issues)}" class="text-muted">No issues found.</p>
+      <p th:if="${#lists.isEmpty(issues)}" class="empty-state">No issues found.</p>
       <table class="table" th:unless="${#lists.isEmpty(issues)}">
         <thead><tr><th>Key</th><th>Title</th><th>Type</th><th>Priority</th><th>Status</th><th>Assignee</th></tr></thead>
         <tbody>
           <tr th:each="i : ${issues}">
             <td><a th:href="@{/projects/{key}/issues/{n}(key=${project.key},n=${i.number})}" th:text="${i.key}">PROJ-1</a></td>
             <td th:text="${i.title}">Title</td>
-            <td th:text="${i.type}">TASK</td>
-            <td th:text="${i.priority}">MEDIUM</td>
-            <td th:text="${i.status}">TO_DO</td>
+            <td><span class="badge" th:attr="data-value=${i.type}" th:text="${i.type}">TASK</span></td>
+            <td><span class="badge" th:attr="data-value=${i.priority}" th:text="${i.priority}">MEDIUM</span></td>
+            <td><span class="badge" th:attr="data-value=${i.status}" th:text="${i.status}">TO_DO</span></td>
             <td th:text="${i.assigneeName}">Unassigned</td>
           </tr>
         </tbody>

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::title}, ~{::main})}">
+<head><title th:text="${project.key} + ' sprints'">Sprints</title></head>
+<body>
+<main class="container py-4">
+  <div th:replace="~{issues/nav :: nav(${project})}"></div>
+  <section id="sprints" th:fragment="sprints">
+    <h2 class="h4">Sprints</h2>
+    <div th:if="${error != null}" class="alert alert-danger" role="alert" th:text="${error}">Error</div>
+    <form method="post" th:action="@{/projects/{key}/sprints(key=${project.key})}"
+          th:hx-post="@{/projects/{key}/sprints(key=${project.key})}" hx-target="#sprints">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+      <label for="sprint-name">Name</label>
+      <input id="sprint-name" name="name" class="form-control" maxlength="100" required th:value="${name}">
+      <button type="submit" class="btn btn-primary">Create sprint</button>
+    </form>
+    <table class="table mt-3">
+      <thead><tr><th>Name</th><th>State</th><th>Issues</th><th>Action</th></tr></thead>
+      <tbody>
+        <tr th:each="sprint : ${sprints}">
+          <td th:text="${sprint.name}">Sprint</td>
+          <td><span class="badge" th:attr="data-value=${sprint.state}" th:text="${sprint.state}">PLANNED</span></td>
+          <td th:text="${sprint.issueCount}">0</td>
+          <td>
+            <form th:if="${sprint.state == 'PLANNED'}" method="post"
+                  th:action="@{/projects/{key}/sprints/{id}/start(key=${project.key},id=${sprint.id})}"
+                  th:hx-post="@{/projects/{key}/sprints/{id}/start(key=${project.key},id=${sprint.id})}" hx-target="#sprints">
+              <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+              <button type="submit" class="btn btn-outline-primary">Start</button>
+            </form>
+            <form th:if="${sprint.state == 'ACTIVE'}" method="post"
+                  th:action="@{/projects/{key}/sprints/{id}/complete(key=${project.key},id=${sprint.id})}"
+                  th:hx-post="@{/projects/{key}/sprints/{id}/complete(key=${project.key},id=${sprint.id})}" hx-target="#sprints">
+              <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+              <button type="submit" class="btn btn-outline-primary">Complete</button>
+            </form>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+</body>
+</html>

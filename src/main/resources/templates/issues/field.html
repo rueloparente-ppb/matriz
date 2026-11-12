@@ -3,7 +3,9 @@
 <body>
 <div class="issue-field mb-2" th:fragment="view(field)" th:id="|issue-${field}|">
   <strong class="text-capitalize" th:if="${field == 'title' or field == 'description'}" th:text="${field}">Field</strong>
-  <span style="white-space: pre-wrap" th:text="${field == 'assignee' ? issue.assigneeName : issue[field]}">Value</span>
+  <span th:class="${field == 'type' or field == 'priority' or field == 'status'} ? 'badge' : 'field-value'"
+        th:attr="data-value=${field == 'type' or field == 'priority' or field == 'status' ? issue[field] : null}"
+        th:text="${field == 'assignee' ? issue.assigneeName : issue[field]}">Value</span>
   <button type="button" class="btn btn-link btn-sm" th:hx-get="@{/projects/{key}/issues/{number}/{field}/edit(key=${project.key},number=${issue.number},field=${field})}"
           hx-target="closest .issue-field" hx-swap="outerHTML" th:aria-label="|Edit ${field}|">Edit</button>
 </div>

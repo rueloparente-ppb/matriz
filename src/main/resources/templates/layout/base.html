@@ -5,13 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="htmx-config" content='{"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"422","swap":true},{"code":"[45]..","swap":false,"error":true}]}'>
   <title th:replace="${title}">Jira clone</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
-  <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.3/Sortable.min.js" defer></script>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+  <script th:src="@{/js/htmx.min.js}" defer></script>
+  <script th:src="@{/js/sortable.min.js}" defer></script>
 </head>
 <body th:hx-headers='${_csrf != null} ? |{"X-CSRF-TOKEN":"${_csrf.token}"}| : null'>
-<nav class="navbar navbar-expand navbar-dark bg-dark px-3">
-  <a class="navbar-brand" href="/">Jira clone</a>
+<nav class="navbar navbar-expand navbar-dark bg-dark px-3" aria-label="Main navigation">
+  <a class="navbar-brand" href="/">Jira <span>clone</span></a>
+  <a class="nav-projects" th:href="@{/projects}">Projects</a>
   <div id="navbar-slot" class="ms-auto d-flex align-items-center">
     <th:block th:if="${currentUser != null}">
       <span class="navbar-text me-3" th:text="${currentUser.displayName}">User</span>

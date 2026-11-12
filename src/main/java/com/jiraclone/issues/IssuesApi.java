@@ -11,6 +11,8 @@ public interface IssuesApi {
 
 	List<IssueRef> findByIds(Collection<Long> ids);
 
+	List<IssueRef> findByProject(long projectId);
+
 	IssueRef changeStatus(long projectId, int number, IssueStatus status, long actorId);
 
 	void markUpdated(long issueId);

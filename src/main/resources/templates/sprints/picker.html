@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<body>
+<div id="issue-sprint" th:fragment="picker">
+  <label for="sprint-choice">Sprint</label>
+  <span class="badge" th:text="${currentName}">None</span>
+  <form method="post" th:action="@{/projects/{key}/issues/{number}/sprint(key=${project.key},number=${number})}"
+        th:hx-post="@{/projects/{key}/issues/{number}/sprint(key=${project.key},number=${number})}"
+        hx-target="#issue-sprint" hx-swap="outerHTML">
+    <input type="hidden" th:if="${_csrf != null}" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+    <select id="sprint-choice" name="sprint" class="form-select">
+      <option value="none" th:selected="${currentSprint == 'none'}">None</option>
+      <option th:each="s : ${availableSprints}" th:value="${s.id}" th:text="${s.name}"
+              th:selected="${currentSprint == s.id.toString()}">Sprint</option>
+    </select>
+    <div th:if="${error}" class="text-danger" th:text="${error}">Invalid sprint</div>
+    <button class="btn btn-primary btn-sm" type="submit">Save sprint</button>
+  </form>
+</div>
+</body>
+</html>

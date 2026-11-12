@@ -3,7 +3,7 @@
       th:replace="~{layout/base :: layout(~{::title}, ~{::main})}">
 <head><title>Log in</title></head>
 <body>
-<main class="container py-5" style="max-width: 400px">
+<main class="container py-5 login-panel">
   <h1 class="h3 mb-3">Log in</h1>
   <div class="alert alert-danger" th:if="${param.error}">Invalid username or password.</div>
   <div class="alert alert-info" th:if="${param.logout}">You have been logged out.</div>

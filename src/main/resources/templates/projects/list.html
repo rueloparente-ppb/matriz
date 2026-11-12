@@ -8,7 +8,7 @@
     <h1 class="h3 m-0">Projects</h1>
     <a class="btn btn-primary" th:href="@{/projects/new}">New project</a>
   </div>
-  <p th:if="${#lists.isEmpty(projects)}" class="text-muted">No projects yet.</p>
+  <p th:if="${#lists.isEmpty(projects)}" class="empty-state">No projects yet.</p>
   <table class="table" th:unless="${#lists.isEmpty(projects)}">
     <thead><tr><th>Key</th><th>Name</th></tr></thead>
     <tbody>
