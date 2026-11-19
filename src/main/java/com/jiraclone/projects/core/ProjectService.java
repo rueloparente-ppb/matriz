@@ -7,8 +7,13 @@ import com.jiraclone.projects.ProjectRef;
 import com.jiraclone.projects.ProjectsApi;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,11 +67,24 @@ public class ProjectService implements ProjectsApi {
 		return projects.findAllByOrderByKeyAsc().stream().map(ProjectService::toRef).toList();
 	}
 
+	@Override
 	public List<ProjectRef> listAccessible(long userId) {
-		var ids = membership.getObject().projectIds(userId);
-		return projects.findAllByOrderByKeyAsc().stream()
-				.filter(p -> p.getCreatedBy() == userId || ids.contains(p.getId()))
-				.map(ProjectService::toRef).toList();
+		return projects.findAll(accessible(userId, ""), Sort.by("key")).stream().map(ProjectService::toRef).toList();
+	}
+
+	public Page<ProjectRef> searchAccessible(long userId, String query, int page) {
+		return projects.findAll(accessible(userId, query), PageRequest.of(page - 1, 25, Sort.by("key")))
+				.map(ProjectService::toRef);
+	}
+
+	private Specification<Project> accessible(long userId, String query) {
+		Set<Long> ids = membership.getObject().projectIds(userId);
+		String pattern = "%" + query.toLowerCase(java.util.Locale.ROOT)
+				.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+		return (root, ignored, cb) -> cb.and(
+				ids.isEmpty() ? cb.equal(root.get("createdBy"), userId)
+						: cb.or(cb.equal(root.get("createdBy"), userId), root.get("id").in(ids)),
+				cb.like(cb.lower(root.get("name")), pattern, '\\'));
 	}
 
 	@Transactional

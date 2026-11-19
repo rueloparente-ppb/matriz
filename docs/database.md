@@ -10,6 +10,7 @@ This is the data model for the Jira clone MVP. It is derived from the specs in [
 | Project (`project`) | projects | `id`; natural key `key` | Container of issues, e.g. `PROJ` |
 | Issue counter (`issue_counter`) | issues | `project_id` | Next issue number for a project |
 | Issue (`issue`) | issues | `id`; natural key (`project_id`, `number`), shown as `PROJ-7` | Unit of work |
+| Assignment (`issue_assignee`) | issues | (`issue_id`, `user_id`) | Users assigned to an issue; derives project membership |
 | Sprint (`sprint`) | sprints | `id`; natural key (`project_id`, `lower(name)`) | Named grouping of issues in a project |
 | Sprint membership (`sprint_issue`) | sprints | `issue_id` | Which sprint an issue is in |
 | Comment (`comment`) | comments | `id` | Plain-text note on an issue |
@@ -32,7 +33,8 @@ This is the data model for the Jira clone MVP. It is derived from the specs in [
 | --- | --- | --- | --- |
 | `id` | `bigint` identity | no | PK |
 | `key` | `varchar(10)` | no | `UNIQUE`; `CHECK (key ~ '^[A-Z]{2,10}$')`; immutable — PRJ-3, PRJ-5 |
-| `name` | `varchar(100)` | no | 1–100 chars after trim — PRJ-4 |
+| `name` | `varchar(100)` | no | 3–100 chars after trim — PRJ-4 |
+| `description` | `varchar(1000)` | yes | Optional, at most 1000 chars |
 | `created_by` | `bigint` | no | FK → `app_user.id` |
 | `created_at` | `timestamptz` | no | Set by system |
 
@@ -55,10 +57,16 @@ This is the data model for the Jira clone MVP. It is derived from the specs in [
 | `type` | `varchar(20)` | no | `CHECK IN ('TASK','BUG','STORY')`, default `TASK` |
 | `priority` | `varchar(20)` | no | `CHECK IN ('LOW','MEDIUM','HIGH')`, default `MEDIUM` |
 | `status` | `varchar(20)` | no | `CHECK IN ('TO_DO','IN_PROGRESS','DONE')`, default `TO_DO` |
-| `assignee_id` | `bigint` | yes | FK → `app_user.id`; null = unassigned |
 | `reporter_id` | `bigint` | no | FK → `app_user.id`; immutable |
 | `created_at` | `timestamptz` | no | Set by system |
 | `updated_at` | `timestamptz` | no | Changes only when a value changes — ISS-17 |
+
+### `issue_assignee`
+
+| Attribute | Type | Null | Rule |
+| --- | --- | --- | --- |
+| `issue_id` | `bigint` | no | FK → `issue.id`; unique with `user_id` |
+| `user_id` | `bigint` | no | FK → `app_user.id`; unique with `issue_id` |
 
 ### `sprint`
 
@@ -109,7 +117,7 @@ This is the data model for the Jira clone MVP. It is derived from the specs in [
 | Project contains Issue | 1 : N | Issue needs a project | Issue never moves project |
 | Project has Issue counter | 1 : 0..1 | Created on first issue | |
 | User reports Issue | 1 : N | Issue needs a reporter | |
-| User is assigned Issue | 0..1 : N | Optional | |
+| User is assigned Issue (via `issue_assignee`) | N : M | Optional for the issue | Each assignment grants project access |
 | Project plans Sprint | 1 : N | Sprint needs a project | |
 | Sprint groups Issue (via `sprint_issue`) | 1 : N | Optional for the issue | Issue in 0..1 sprint |
 | Issue has Comment | 1 : N | Comment needs an issue | |
@@ -123,7 +131,8 @@ This is the data model for the Jira clone MVP. It is derived from the specs in [
 erDiagram
     APP_USER ||--o{ PROJECT : "creates"
     APP_USER ||--o{ ISSUE : "reports"
-    APP_USER |o--o{ ISSUE : "is assigned"
+    APP_USER ||--o{ ISSUE_ASSIGNEE : "is assigned"
+    ISSUE ||--o{ ISSUE_ASSIGNEE : "has assignees"
     PROJECT ||--o{ ISSUE : "contains"
     PROJECT ||--o| ISSUE_COUNTER : "numbers issues with"
     PROJECT ||--o{ SPRINT : "plans"
@@ -143,7 +152,8 @@ erDiagram
     PROJECT {
         bigint id PK
         varchar key UK "A-Z, 2 to 10, immutable"
-        varchar name "1 to 100"
+        varchar name "3 to 100"
+        varchar description "max 1000, nullable"
         bigint created_by FK
         timestamptz created_at
     }
@@ -160,10 +170,13 @@ erDiagram
         varchar type "TASK, BUG, STORY"
         varchar priority "LOW, MEDIUM, HIGH"
         varchar status "TO_DO, IN_PROGRESS, DONE"
-        bigint assignee_id FK "nullable"
         bigint reporter_id FK
         timestamptz created_at
         timestamptz updated_at
+    }
+    ISSUE_ASSIGNEE {
+        bigint issue_id FK "unique with user_id"
+        bigint user_id FK "unique with issue_id"
     }
     SPRINT {
         bigint id PK
@@ -209,7 +222,10 @@ erDiagram
 | BR-7 | Sprint names are unique per project ignoring case | `UNIQUE (project_id, lower(name))` | SPR-2 |
 | BR-8 | Change and its history entry are stored together | Same transaction (synchronous listener) | Activity-history atomicity note |
 | BR-9 | History keeps names as they were | `old_value`/`new_value` store display text, not FKs | Activity-history stable names note |
-| BR-10 | Nothing is deleted | No delete operations; FKs `ON DELETE RESTRICT` | All specs (no delete in scope) |
+| BR-10 | Deleting a project or issue removes its dependents atomically | Child FKs to `project`, `issue` and `sprint` use `ON DELETE CASCADE` (V10) | PRJ-D2–D4, ISS-D1–D2 |
+| BR-11 | No duplicate assignee on an issue | `UNIQUE (issue_id, user_id)` | ASG-2, ASG-3 |
+
+Flyway V8 migrates existing issue assignees into `issue_assignee` and drops the old issue column; V9 adds `project.description`; V10 enables cascade deletion on `issue`/`issue_counter`/`sprint` → `project`, `comment`/`issue_history`/`issue_assignee`/`sprint_issue` → `issue`, and `sprint_issue` → `sprint`.
 
 Rules enforced by services, not the schema: trimming and length minimums, sprint and issue being in the same project, `COMPLETED` sprints not receiving issues (SPR-11), state transitions (SPR-6), no-op detection (ISS-17).
 
@@ -231,7 +247,7 @@ Rules enforced by services, not the schema: trimming and length minimums, sprint
 
 - **Every spec entity is modelled.** User, project, issue, comment, history entry and sprint each have a table; sprint membership and issue numbering have their own tables so that each table has exactly one owning module.
 - **Every issue field in the issues spec has a column**, with matching limits and allowed values. `key` is not stored; it is `project.key || '-' || issue.number`, so it can never disagree with its parts.
-- **Cardinalities match the specs.** An issue has 0..1 assignee, exactly 1 reporter, exactly 1 project and 0..1 sprint; a project has at most 1 active sprint; an issue has at least 1 history entry.
+- **Cardinalities match the specs.** An issue has zero or more assignees, exactly 1 reporter, exactly 1 project and 0..1 sprint; a project has at most 1 active sprint; an issue has at least 1 history entry.
 - **Concurrency requirements map to constraints** (PRJ-6, ISS-5, SPR-5), so they hold under parallel requests without application locks.
 - **No table is written by two modules.** `issue.updated_at` changed because of a sprint move is written by `issues` through `IssuesApi.markUpdated`.
-- **Not modelled on purpose:** roles, project membership, attachments, labels, epics and subtasks, sprint dates, deleted rows — all out of scope in the specs.
+- **Not modelled on purpose:** explicit project roles/membership tables, attachments, labels, epics and subtasks, sprint dates or soft-deleted rows; membership is derived from assignments.

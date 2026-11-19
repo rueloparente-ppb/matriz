@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 class ProjectController {
@@ -40,8 +41,26 @@ class ProjectController {
 	}
 
 	@GetMapping("/projects")
-	String list(Model model) {
-		model.addAttribute("projects", projects.listAccessible(identity.currentUser().orElseThrow().id()));
+	Object list(@RequestParam(required = false) String q, @RequestParam(required = false) String page, Model model) {
+		String query = q == null ? "" : q.trim();
+		model.addAttribute("q", query);
+		int number = 1;
+		if (page != null && !page.isBlank()) {
+			try {
+				number = Integer.parseInt(page.trim());
+			} catch (NumberFormatException e) {
+				model.addAttribute("error", "Page must be a number");
+				return ErrorViews.unprocessable("projects/list");
+			}
+			if (number < 1) {
+				model.addAttribute("error", "Page must be 1 or greater");
+				return ErrorViews.unprocessable("projects/list");
+			}
+		}
+		var result = projects.searchAccessible(identity.currentUser().orElseThrow().id(), query, number);
+		model.addAttribute("projects", result.getContent());
+		model.addAttribute("page", number);
+		model.addAttribute("totalPages", result.getTotalPages());
 		return "projects/list";
 	}
 

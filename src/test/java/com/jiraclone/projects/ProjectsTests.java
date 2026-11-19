@@ -74,10 +74,10 @@ class ProjectsTests extends AbstractIntegrationTest {
 		String suffix = randomKey();
 		String second = "ZZ" + suffix.substring(0, 4);
 		String first = "AA" + suffix.substring(0, 4);
-		create("alice", second, "Second").andExpect(status().isFound());
-		create("alice", first, "First").andExpect(status().isFound());
+		create("alice", second, "Second " + suffix).andExpect(status().isFound());
+		create("alice", first, "First " + suffix).andExpect(status().isFound());
 
-		String html = mvc.perform(get("/projects").with(user("alice")))
+		String html = mvc.perform(get("/projects").with(user("alice")).param("q", suffix))
 				.andExpect(status().isOk())
 				.andReturn().getResponse().getContentAsString();
 		assertThat(html).contains(first, second, "First", "Second");

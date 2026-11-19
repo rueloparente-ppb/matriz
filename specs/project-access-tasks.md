@@ -150,8 +150,8 @@ Design proposals (**not confirmed — please confirm or change before approving*
 **Requirements:** ACC-1 (list), SRC-1, SRC-2
 **Affected code:** `ProjectsApi`/`ProjectService` search method, `ProjectRepository` (specification or query), `ProjectController.list`, `templates/projects/list.html`, shared page-parsing helper used by `issues/web/IssueListQuery`
 
-- [ ] 8.1 Query: owned or member projects, name contains `q` (case-insensitive), key ascending, 25 per page. Check: tests with two users; non-accessible project never appears for any `q`.
-- [ ] 8.2 `page` validation (`422` for non-numeric or <1; empty list past the end) and empty-state message. Check: tests.
+- [x] 8.1 Query: owned or member projects, name contains `q` (case-insensitive), key ascending, 25 per page. Check: tests with two users; non-accessible project never appears for any `q`.
+- [x] 8.2 `page` validation (`422` for non-numeric or <1; empty list past the end) and empty-state message. Check: tests.
 
 ### 9. Dashboard
 
@@ -162,9 +162,9 @@ Design proposals (**not confirmed — please confirm or change before approving*
 **Requirements:** DSH-1…DSH-4, ISS-D3
 **Affected code:** `common/HomeController` (or a dashboard controller in the owning module), `IssuesApi` (counts per project and status via a grouped query in `IssueRepository`), new `templates/dashboard.html`, `layout/base.html` (user/logout)
 
-- [ ] 9.1 Grouped count query returning zero for missing statuses; dashboard rendered per accessible project with links. Check: test with >25 issues proves counts are not page-limited (DSH-2).
-- [ ] 9.2 Counts update after status change, create and delete on the next request. Check: tests (DSH-3, ISS-D3).
-- [ ] 9.3 Empty state and no leakage of other users' projects. Check: test (DSH-4).
+- [x] 9.1 Grouped count query returning zero for missing statuses; dashboard rendered per accessible project with links. Check: test with >25 issues proves counts are not page-limited (DSH-2).
+- [x] 9.2 Counts update after status change, create and delete on the next request. Check: tests (DSH-3, ISS-D3).
+- [x] 9.3 Empty state and no leakage of other users' projects. Check: test (DSH-4).
 
 ### 10. End-to-end verification and documentation
 
@@ -174,9 +174,9 @@ Design proposals (**not confirmed — please confirm or change before approving*
 **Estimated source lines:** ~0 (tests and docs)
 **Requirements:** ACC-5, ACC-8; consistency of related specs
 
-- [ ] 10.1 Parameterised test: for every route in the spec and existing project routes, unauthenticated → login redirect/`401`; user B with changed key/number/userId → `404`. Check: new test class (ACC-5, ACC-8).
-- [ ] 10.2 Update `projects-spec.md`, `issues-spec.md`, `database.md`, `openapi.yaml` and README for ownership, assignees, deletion and the name rule. Check: manual diff review against `project-access-spec.md`; no remaining "nothing is deleted"/single-assignee statements.
-- [ ] 10.3 Run `./mvnw verify` (includes `ArchitectureTests` and module tests). Check: green output recorded.
+- [x] 10.1 Parameterised test: for every route in the spec and existing project routes, unauthenticated → login redirect/`401`; user B with changed key/number/userId → `404`. Check: new test class (ACC-5, ACC-8).
+- [x] 10.2 Update `projects-spec.md`, `issues-spec.md`, `database.md`, `openapi.yaml` and README for ownership, assignees, deletion and the name rule. Check: manual diff review against `project-access-spec.md`; no remaining "nothing is deleted"/single-assignee statements.
+- [x] 10.3 Run `./mvnw verify` (includes `ArchitectureTests` and module tests). Check: green output recorded.
 
 ## Coverage and ordering
 

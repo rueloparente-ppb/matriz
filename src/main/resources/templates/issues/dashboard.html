@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{layout/base :: layout(~{::title}, ~{::main})}">
+<head><title>Dashboard</title></head>
+<body>
+<main class="container py-4">
+  <h1 class="h3" th:text="'Dashboard for ' + ${currentUser.displayName}">Dashboard</h1>
+  <p th:if="${#lists.isEmpty(projects)}" class="empty-state">No projects found.</p>
+  <table th:unless="${#lists.isEmpty(projects)}" class="table">
+    <thead><tr><th>Project</th><th>TO_DO</th><th>IN_PROGRESS</th><th>DONE</th></tr></thead>
+    <tbody>
+      <tr th:each="summary : ${projects}">
+        <td><a th:href="@{/projects/{key}(key=${summary.project.key})}" th:text="${summary.project.key} + ' — ' + ${summary.project.name}">Project</a></td>
+        <td th:text="${summary.counts[T(com.jiraclone.issues.IssueStatus).TO_DO]}">0</td>
+        <td th:text="${summary.counts[T(com.jiraclone.issues.IssueStatus).IN_PROGRESS]}">0</td>
+        <td th:text="${summary.counts[T(com.jiraclone.issues.IssueStatus).DONE]}">0</td>
+      </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

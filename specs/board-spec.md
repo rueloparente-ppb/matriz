@@ -23,7 +23,7 @@ The board shows one project's issues as cards in three columns, one per status: 
 
 - **Columns** — Exactly three columns are always shown, even when empty, titled in the fixed order To Do, In Progress, Done.
 - **Card order** — Cards within a column are ordered by issue number ascending. Dragging does not store a position within a column; only the column change is persisted.
-- **Card content** — Key, title, type, priority and assignee display name (or "Unassigned"). A card links to the issue detail page.
+- **Card content** — Key, title, type, priority and all assignee display names (or "Unassigned"). A card links to the issue detail page.
 - **Failed move** — When a move is rejected the board is re-rendered from stored data, so the card visibly returns to its original column.
 - **Same-column drop** — Dropping a card on its own column is a no-op: no change, no history entry.
 - **Precedence** — Unknown project returns `404` before the issue or status are checked; unknown issue `404` before invalid status `422`.

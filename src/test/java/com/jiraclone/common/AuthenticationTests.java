@@ -122,12 +122,12 @@ class AuthenticationTests extends AbstractIntegrationTest {
 	}
 
 	@Test
-	void rootRedirectsToProjects() throws Exception {
+	void rootRendersDashboard() throws Exception {
 		MockHttpSession session = login("alice", "password");
 
 		mvc.perform(get("/").session(session))
-				.andExpect(status().isFound())
-				.andExpect(redirectedUrl("/projects"));
+				.andExpect(status().isOk())
+				.andExpect(content().string(org.hamcrest.Matchers.containsString("Dashboard for Alice Anderson")));
 	}
 
 	@Test

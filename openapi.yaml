@@ -1,20 +1,22 @@
 openapi: 3.1.0
 info:
-  title: Jira Clone MVP — Issues
+  title: Jira Clone MVP — Project access and issues
   version: 0.1.0
-  summary: Two issue operations of the Jira clone MVP.
+  summary: Server-rendered project dashboard, lifecycle, assignments and issue operations.
   description: |
     The application is server-rendered (Thymeleaf + htmx). These operations are
     the same HTTP endpoints the browser uses: requests are HTML form posts or
     query strings, and responses are HTML pages or htmx fragments, not JSON.
     There is deliberately no separate JSON API (see `AGENTS.md`).
 
-    Behaviour is owned by `specs/issues-spec.md`; requirement IDs (`ISS-n`) are
-    cited in descriptions. Authentication rules are in
-    `specs/authentication-spec.md`.
+    Behaviour is owned by `specs/issues-spec.md`, `specs/projects-spec.md` and
+    `specs/project-access-spec.md`. Authentication rules are in
+    `specs/authentication-spec.md`. Non-members receive 404 on project-scoped
+    routes; members receive 403 on owner-only mutations. Posts require CSRF.
 
-    **htmx:** a request with header `HX-Request: true` receives only the
-    fragment that changed; a normal request receives the full page.
+    **htmx:** fragment-capable requests with `HX-Request: true` return the
+    affected fragment; deletion and project editing use `HX-Redirect` instead
+    of a 302. A normal request receives the full page or a redirect.
 servers:
   - url: http://localhost:8080
     description: Local (docker compose)
@@ -22,9 +24,256 @@ security:
   - sessionCookie: []
 tags:
   - name: Issues
-    description: Create and list issues in a project.
+    description: Issues and assignees in a project.
+  - name: Projects
+    description: Accessible projects and owner-only lifecycle.
 
 paths:
+  /:
+    get:
+      tags: [Projects]
+      summary: Dashboard for the current user, with accessible projects and per-status issue counts
+      responses:
+        '200':
+          description: HTML dashboard (including empty state when no projects are accessible).
+        '302':
+          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/HtmxUnauthenticated'
+
+  /projects:
+    get:
+      tags: [Projects]
+      summary: List owned or assigned-to projects, sorted by key, 25 per page
+      parameters:
+        - name: q
+          in: query
+          description: Case-insensitive substring of project name; blank means all accessible projects.
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: 1-based page number; pages past the end are empty.
+          schema:
+            type: integer
+            minimum: 1
+      responses:
+        '200':
+          description: HTML project list or empty state.
+        '302':
+          $ref: '#/components/responses/LoginRedirect'
+        '401':
+          $ref: '#/components/responses/HtmxUnauthenticated'
+        '422':
+          description: Non-numeric or less-than-one page; HTML list with error.
+    post:
+      tags: [Projects]
+      summary: Create a project owned by the current user
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [key, name]
+              properties:
+                key:
+                  type: string
+                  pattern: '^[A-Z]{2,10}$'
+                name:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '302':
+          description: Redirect to `/projects/{key}` (which redirects to the issue list).
+        '401':
+          $ref: '#/components/responses/HtmxUnauthenticated'
+        '403':
+          description: Missing or invalid CSRF token.
+        '422':
+          description: Invalid key, name or description, or key already in use; HTML form with errors.
+
+  /projects/{projectKey}/edit:
+    parameters:
+      - $ref: '#/components/parameters/ProjectKey'
+    get:
+      tags: [Projects]
+      summary: Owner-only project edit form
+      responses:
+        '200':
+          description: HTML edit form.
+        '403':
+          description: Member is not the owner.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectKey}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectKey'
+    post:
+      tags: [Projects]
+      summary: Owner-only name/description update; key remains immutable
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/HxRequest'
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  minLength: 3
+                  maxLength: 100
+                description:
+                  type: string
+                  maxLength: 1000
+      responses:
+        '302':
+          description: Redirect to project (normal request).
+        '200':
+          description: HX-Redirect to project (htmx request).
+        '403':
+          description: Member or invalid CSRF token.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Validation failed; HTML edit form with errors.
+
+  /projects/{projectKey}/delete:
+    parameters:
+      - $ref: '#/components/parameters/ProjectKey'
+    get:
+      tags: [Projects]
+      summary: Owner-only project deletion confirmation
+      responses:
+        '200':
+          description: HTML confirmation page.
+        '403':
+          description: Member is not the owner.
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Projects]
+      summary: Delete project and dependent data atomically (owner only)
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/HxRequest'
+      responses:
+        '302':
+          description: Redirect to `/projects` (normal request).
+        '200':
+          description: HX-Redirect to `/projects` (htmx request).
+        '403':
+          description: Member or invalid CSRF token.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectKey}/issues/{number}/delete:
+    parameters:
+      - $ref: '#/components/parameters/ProjectKey'
+      - $ref: '#/components/parameters/IssueNumber'
+    get:
+      tags: [Issues]
+      summary: Owner-only issue deletion confirmation
+      responses:
+        '200':
+          description: HTML confirmation page.
+        '403':
+          description: Member is not the owner.
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Issues]
+      summary: Delete issue and dependent rows (owner only)
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/HxRequest'
+      responses:
+        '302':
+          description: Redirect to project issue list (normal request).
+        '200':
+          description: HX-Redirect to project issue list (htmx request).
+        '403':
+          description: Member or invalid CSRF token.
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectKey}/issues/{number}/assignees:
+    parameters:
+      - $ref: '#/components/parameters/ProjectKey'
+      - $ref: '#/components/parameters/IssueNumber'
+      - $ref: '#/components/parameters/HxRequest'
+    get:
+      tags: [Issues]
+      summary: Owner-only current assignees and eligible users
+      responses:
+        '200':
+          description: HTML page or assignee fragment for htmx.
+        '403':
+          description: Member is not the owner.
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Issues]
+      summary: Add one assignee (owner only)
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+                  pattern: '^[0-9]+$'
+      responses:
+        '302':
+          description: Redirect to issue detail (normal request).
+        '200':
+          description: Updated assignee fragment (htmx request).
+        '403':
+          description: Member or invalid CSRF token.
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: Duplicate, unknown or invalid user id; HTML form with error.
+
+  /projects/{projectKey}/issues/{number}/assignees/{userId}/delete:
+    parameters:
+      - $ref: '#/components/parameters/ProjectKey'
+      - $ref: '#/components/parameters/IssueNumber'
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int64
+    post:
+      tags: [Issues]
+      summary: Remove one assignee (owner only)
+      parameters:
+        - $ref: '#/components/parameters/CsrfHeader'
+        - $ref: '#/components/parameters/HxRequest'
+      responses:
+        '302':
+          description: Redirect to issue detail (normal request).
+        '200':
+          description: Updated assignee fragment (htmx request).
+        '403':
+          description: Member or invalid CSRF token.
+        '404':
+          description: Inaccessible project, missing issue or missing assignment.
+
   /projects/{projectKey}/issues:
     parameters:
       - $ref: '#/components/parameters/ProjectKey'
@@ -38,7 +287,7 @@ paths:
         Returns the project's issues, newest number first, 25 per page (ISS-9).
         Filters combine with AND (ISS-10); `q` is combined with filters by AND
         (ISS-11). A missing filter means no restriction. An invalid filter value
-        is rejected, never ignored (ISS-12). An unknown project returns `404`
+        is rejected, never ignored (ISS-12). An inaccessible or unknown project returns `404`
         before any parameter is validated.
       parameters:
         - name: status
@@ -122,7 +371,8 @@ paths:
         Creates an issue with status `TO_DO`, the current user as reporter, and
         the next number in the project (ISS-1). Concurrent creates receive
         distinct consecutive numbers (ISS-5). A rejected create consumes no
-        number (ISS-3). An unknown project returns `404` before validation.
+        number (ISS-3). Only the owner may create; an inaccessible or unknown
+        project returns `404` before validation.
       parameters:
         - $ref: '#/components/parameters/CsrfHeader'
       requestBody:
@@ -136,7 +386,6 @@ paths:
               description: Steps to reproduce...
               type: BUG
               priority: HIGH
-              assignee: '42'
               _csrf: 3f1c9e2a-...
       responses:
         '302':
@@ -151,7 +400,7 @@ paths:
         '401':
           $ref: '#/components/responses/HtmxUnauthenticated'
         '403':
-          description: Missing or invalid CSRF token. Nothing is created.
+          description: Member is not the owner, or missing/invalid CSRF token. Nothing is created.
         '404':
           $ref: '#/components/responses/NotFound'
         '422':
@@ -183,6 +432,13 @@ components:
         type: string
         pattern: '^[A-Z]{2,10}$'
       example: PROJ
+    IssueNumber:
+      name: number
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
     HxRequest:
       name: HX-Request
       in: header
@@ -217,7 +473,7 @@ components:
             type: string
             const: /login
     NotFound:
-      description: Unknown project key. Nothing is disclosed about other projects.
+      description: Unknown or inaccessible project key or issue. Nothing is disclosed about other projects.
       content:
         text/html:
           schema:
@@ -253,10 +509,6 @@ components:
         priority:
           $ref: '#/components/schemas/IssuePriority'
           default: MEDIUM
-        assignee:
-          description: Existing user id. Empty or `none` means unassigned.
-          type: string
-          pattern: '^([0-9]+|none)?$'
         _csrf:
           type: string
           description: CSRF token for plain form posts.
@@ -281,9 +533,11 @@ components:
           $ref: '#/components/schemas/IssuePriority'
         status:
           $ref: '#/components/schemas/IssueStatus'
-        assignee:
-          type: [string, 'null']
-          description: Assignee display name, or null when unassigned.
+        assignees:
+          type: array
+          description: Display names of all assigned users; empty when unassigned.
+          items:
+            type: string
 
     IssueListPage:
       type: object

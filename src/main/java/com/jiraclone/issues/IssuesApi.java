@@ -2,6 +2,7 @@ package com.jiraclone.issues;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /** Public issue operations for the board and other modules. Project ids must be resolved by ProjectsApi. */
@@ -12,6 +13,8 @@ public interface IssuesApi {
 	List<IssueRef> findByIds(Collection<Long> ids);
 
 	List<IssueRef> findByProject(long projectId);
+
+	Map<IssueStatus, Long> countsByStatus(long projectId);
 
 	IssueRef changeStatus(long projectId, int number, IssueStatus status, long actorId);
 

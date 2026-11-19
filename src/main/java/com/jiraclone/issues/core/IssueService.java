@@ -10,7 +10,9 @@ import com.jiraclone.issues.IssueType;
 import com.jiraclone.issues.IssuesApi;
 import com.jiraclone.projects.ProjectMembership;
 import java.util.Collection;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -100,6 +102,14 @@ public class IssueService implements IssuesApi, ProjectMembership {
 	@Override
 	public List<IssueRef> findByProject(long projectId) {
 		return issues.findByProjectIdOrderByNumberAsc(projectId).stream().map(IssueService::toRef).toList();
+	}
+
+	@Override
+	public Map<IssueStatus, Long> countsByStatus(long projectId) {
+		Map<IssueStatus, Long> counts = new EnumMap<>(IssueStatus.class);
+		for (IssueStatus status : IssueStatus.values()) counts.put(status, 0L);
+		for (var row : issues.countByStatus(projectId)) counts.put(row.getStatus(), row.getTotal());
+		return Map.copyOf(counts);
 	}
 
 	@Override

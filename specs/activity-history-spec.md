@@ -21,7 +21,7 @@ Every issue keeps an append-only log of changes, shown on the issue detail page,
 
 - **Entry shape** — Each entry has actor (user), timestamp, a kind, and old and new display values. The kinds are `CREATED`, `FIELD_CHANGED` (with the field name) and `SPRINT_CHANGED`.
 - **Recorded fields** — `title`, `description`, `type`, `priority`, `status`, `assignee`, and sprint membership.
-- **Display values** — Assignee is recorded by display name, sprint by name, empty values shown as "None". Long values (description, title) are stored in full but displayed truncated to 100 characters.
+- **Display values** — Each assignee addition/removal records that user's display name and "None" on the empty side; sprint changes use sprint names. Long values (description, title) are stored in full but displayed truncated to 100 characters.
 - **One entry per field** — A single change of one field produces one entry. A change that does not alter the stored value produces none.
 - **Atomic** — The change and its entry are stored together; a failed change leaves no entry and a failed entry write leaves no change.
 - **Not recorded** — Comments and system timestamps.
@@ -37,14 +37,14 @@ Every issue keeps an append-only log of changes, shown on the issue detail page,
 | `HST-3` | Basic | Changing status from the board writes the same `status` entry as changing it from the issue page |
 | `HST-4` | Basic | Setting a field to its current value writes no entry |
 | `HST-5` | Validation | A rejected change (`422`) writes no entry |
-| `HST-6` | Basic | Assigning, reassigning and clearing the assignee record display names, or "None" when empty |
+| `HST-6` | Basic | Adding or removing an assignee records that user's display name and "None" on the empty side |
 | `HST-7` | Basic | Entries are listed newest first |
 | `HST-8` | Basic | Entries for an issue are never shown on another issue |
 | `HST-9` | Basic | Values over 100 characters are displayed truncated; the full value is not lost |
 | `HST-10` | Basic | Comments produce no entries |
 | `HST-11` | Security | Values containing HTML or script are rendered escaped |
 | `HST-12` | Basic | Unknown project or issue returns `404` |
-| `HST-13` | Persistence | Entries remain after an application restart; no endpoint edits or deletes them |
+| `HST-13` | Persistence | Entries remain after an application restart; no endpoint edits them, but deleting the parent issue/project cascades to its history |
 | `HST-14` | Authentication | Unauthenticated requests receive the responses defined in the authentication spec; no history is disclosed |
 
 ## Out of Scope
