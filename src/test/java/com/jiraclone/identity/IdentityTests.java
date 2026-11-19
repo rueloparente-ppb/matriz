@@ -45,9 +45,9 @@ class IdentityTests extends AbstractIntegrationTest {
 
 	@Test
 	void seededPasswordsAreBcryptHashesNotPlainText() {
-		List<String> hashes = jdbc.queryForList("SELECT password_hash FROM app_user", String.class);
+		List<String> hashes = jdbc.queryForList("SELECT password_hash FROM app_user WHERE username IN ('alice', 'bob', 'carol')", String.class);
 
-		assertThat(hashes).hasSizeGreaterThanOrEqualTo(3).allSatisfy(hash -> {
+		assertThat(hashes).hasSize(3).allSatisfy(hash -> {
 			assertThat(hash).isNotEqualTo("password");
 			assertThat(passwordEncoder.matches("password", hash)).isTrue();
 		});

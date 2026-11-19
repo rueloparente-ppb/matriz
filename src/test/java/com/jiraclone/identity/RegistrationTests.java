@@ -15,6 +15,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,9 +37,17 @@ class RegistrationTests extends AbstractIntegrationTest {
 	@Autowired
 	UserDetailsService userDetailsService;
 
+	private long maxUserIdBeforeTest;
+
+	@BeforeEach
+	void rememberExistingUsers() {
+		maxUserIdBeforeTest = jdbc.queryForObject("select coalesce(max(id), 0) from app_user", Long.class);
+	}
+
+	/** Removes only users registered by this test; users other test classes created in the shared database stay. */
 	@AfterEach
 	void removeRegisteredUsers() {
-		jdbc.update("delete from app_user where username not in ('alice', 'bob', 'carol')");
+		jdbc.update("delete from app_user where id > ?", maxUserIdBeforeTest);
 	}
 
 	private MvcResult register(String username, String password, String confirmation) throws Exception {
