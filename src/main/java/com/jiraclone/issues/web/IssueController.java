@@ -19,6 +19,7 @@ import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.springframework.beans.propertyeditors.StringTrimmerEditor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -120,6 +121,27 @@ class IssueController {
 			model.addAttribute("eligible", identity.listUsers().stream().filter(u -> !issue.assigneeIds().contains(u.id())).toList());
 		}
 		return "issues/detail";
+	}
+
+	@GetMapping("/projects/{key}/issues/{number}/delete")
+	String deleteForm(@ModelAttribute("project") ProjectRef project, @PathVariable int number, Model model) {
+		IssueDetail issue = issues.find(project.id(), number)
+				.orElseThrow(() -> new NotFoundException("Issue " + project.key() + "-" + number));
+		owner(project);
+		model.addAttribute("issue", toView(project, issue, userIndex()));
+		return "issues/delete";
+	}
+
+	@PostMapping("/projects/{key}/issues/{number}/delete")
+	Object delete(@ModelAttribute("project") ProjectRef project, @PathVariable int number,
+			@RequestHeader(value = "HX-Request", required = false) String hx) {
+		issues.find(project.id(), number)
+				.orElseThrow(() -> new NotFoundException("Issue " + project.key() + "-" + number));
+		owner(project);
+		issues.delete(project.id(), number);
+		String target = "/projects/" + project.key() + "/issues";
+		return "true".equalsIgnoreCase(hx) ? ResponseEntity.ok().header("HX-Redirect", target).build()
+				: "redirect:" + target;
 	}
 
 	@GetMapping("/projects/{key}/issues/{number}/{field}")

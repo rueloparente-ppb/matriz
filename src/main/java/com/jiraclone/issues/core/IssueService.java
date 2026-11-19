@@ -80,6 +80,13 @@ public class IssueService implements IssuesApi, ProjectMembership {
 		return issues.findByProjectIdAndNumber(projectId, number).map(IssueService::toDetail);
 	}
 
+	@Transactional
+	public void delete(long projectId, int number) {
+		Issue issue = issues.findByProjectIdAndNumber(projectId, number)
+				.orElseThrow(() -> new NotFoundException("Issue " + number));
+		issues.delete(issue);
+	}
+
 	@Override
 	public Optional<IssueRef> findIssue(long projectId, int number) {
 		return issues.findByProjectIdAndNumber(projectId, number).map(IssueService::toRef);

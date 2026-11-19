@@ -123,9 +123,9 @@ Design proposals (**not confirmed — please confirm or change before approving*
 **Requirements:** ISS-D1, ISS-D2
 **Affected code:** new migration setting `ON DELETE CASCADE` on child FKs of `issue` (`comment`, `issue_history`, `issue_assignee`, `sprint_issue`), `IssueService`, `IssueController`, `templates/issues/detail.html` (confirmation), `IssueNumbering`
 
-- [ ] 6.1 Migration for cascading FKs; `POST .../issues/{number}/delete` (owner only) with a confirmation step in the UI. Check: after deletion, no comments, history, assignments or sprint membership rows remain (test queries via repositories) and the issue returns `404`.
-- [ ] 6.2 Numbering test: create 1–3, delete 3, create again gets 4 (counter unchanged) (ISS-D2). Check: test.
-- [ ] 6.3 Member → `403`; non-member → `404`; htmx request handled via redirect-safe response (`HX-Redirect`). Check: tests with and without `HX-Request`.
+- [x] 6.1 Migration for cascading FKs; `POST .../issues/{number}/delete` (owner only) with a confirmation step in the UI. Check: after deletion, no comments, history, assignments or sprint membership rows remain (test queries via repositories) and the issue returns `404`.
+- [x] 6.2 Numbering test: create 1–3, delete 3, create again gets 4 (counter unchanged) (ISS-D2). Check: test.
+- [x] 6.3 Member → `403`; non-member → `404`; htmx request handled via redirect-safe response (`HX-Redirect`). Check: tests with and without `HX-Request`.
 
 ### 7. Project deletion
 
@@ -136,10 +136,10 @@ Design proposals (**not confirmed — please confirm or change before approving*
 **Requirements:** PRJ-D1…PRJ-D4
 **Affected code:** migration cascading `issue`, `issue_counter`, `sprint` FKs to `project`, `ProjectService`, `ProjectController`, new `templates/projects/delete.html`
 
-- [ ] 7.1 `GET /projects/{key}/delete` renders confirmation and deletes nothing (PRJ-D1). Check: test.
-- [ ] 7.2 `POST /projects/{key}/delete` removes the project and all dependants, redirects to `/projects` (PRJ-D2, PRJ-D4). Check: seeded project with issues, comments, history, sprint, assignments leaves zero rows.
-- [ ] 7.3 Atomicity (PRJ-D3): a simulated failure mid-delete rolls back everything. Check: test using an injected failure in the transaction; the project and children remain.
-- [ ] 7.4 Key reuse after delete and owner-only/`403`/`404` behaviour. Check: tests.
+- [x] 7.1 `GET /projects/{key}/delete` renders confirmation and deletes nothing (PRJ-D1). Check: test.
+- [x] 7.2 `POST /projects/{key}/delete` removes the project and all dependants, redirects to `/projects` (PRJ-D2, PRJ-D4). Check: seeded project with issues, comments, history, sprint, assignments leaves zero rows.
+- [x] 7.3 Atomicity (PRJ-D3): a simulated failure mid-delete rolls back everything. Check: test using an injected failure in the transaction; the project and children remain.
+- [x] 7.4 Key reuse after delete and owner-only/`403`/`404` behaviour. Check: tests.
 
 ### 8. Accessible projects with search and paging
 

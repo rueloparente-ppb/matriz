@@ -75,6 +75,12 @@ public class ProjectService implements ProjectsApi {
 		project.edit(name, description.isEmpty() ? null : description);
 	}
 
+	@Transactional
+	public void delete(String key) {
+		Project project = projects.findByKey(key).orElseThrow(() -> new NotFoundException("Project " + key));
+		projects.delete(project);
+	}
+
 	private static ProjectRef toRef(Project p) {
 		return new ProjectRef(p.getId(), p.getKey(), p.getName(), p.getDescription() == null ? "" : p.getDescription());
 	}

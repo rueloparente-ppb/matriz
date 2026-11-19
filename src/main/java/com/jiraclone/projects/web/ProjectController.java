@@ -90,6 +90,20 @@ class ProjectController {
 		return "redirect:/projects/" + key;
 	}
 
+	@GetMapping("/projects/{key}/delete")
+	String deleteForm(@PathVariable String key, Model model) {
+		model.addAttribute("project", owner(key));
+		return "projects/delete";
+	}
+
+	@PostMapping("/projects/{key}/delete")
+	Object delete(@PathVariable String key, @RequestHeader(value = "HX-Request", required = false) String hx) {
+		owner(key);
+		projects.delete(key);
+		return "true".equalsIgnoreCase(hx) ? ResponseEntity.ok().header("HX-Redirect", "/projects").build()
+				: "redirect:/projects";
+	}
+
 	private ProjectRef owner(String key) {
 		var access = projects.findAccessible(key, identity.currentUser().orElseThrow().id())
 				.orElseThrow(() -> new NotFoundException("Project " + key));

@@ -8,6 +8,7 @@
     <a class="btn btn-outline-secondary" th:href="@{/projects/{key}/issues(key=${project.key})}">List</a>
     <a class="btn btn-outline-secondary" th:href="@{/projects/{key}/board(key=${project.key})}">Board</a>
     <a th:if="${projectRole == 'OWNER'}" class="btn btn-outline-secondary" th:href="@{/projects/{key}/edit(key=${project.key})}">Edit project</a>
+    <a th:if="${projectRole == 'OWNER'}" class="btn btn-outline-danger" th:href="@{/projects/{key}/delete(key=${project.key})}">Delete project</a>
     <a class="btn btn-outline-secondary" th:href="@{/projects/{key}/sprints(key=${project.key})}">Sprints</a>
     <a th:if="${projectRole == 'OWNER'}" class="btn btn-primary" th:href="@{/projects/{key}/issues/new(key=${project.key})}">New issue</a>
   </div>
