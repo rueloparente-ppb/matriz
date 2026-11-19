@@ -1,12 +1,12 @@
 # Architecture Reference
 
-This document describes how the Jira clone MVP is structured. Behaviour is owned by the specs in [`specs/`](../specs); coding rules are in [`AGENTS.md`](../AGENTS.md); the data model is in [`database.md`](./database.md). This is a target architecture: until the skeleton MR lands, no code exists.
+This document describes how the Jira clone MVP is structured. Behaviour is owned by the specs in [`specs/`](../specs); coding rules are in [`AGENTS.md`](../AGENTS.md); the data model is in [`database.md`](./database.md); the HTTP surface is in [`api/openapi.yaml`](./api/openapi.yaml). It reflects the implemented code; update it in the same change when module boundaries, flows or decisions change.
 
 ## 1. System context
 
 ```mermaid
 flowchart LR
-    user([Seeded user<br/>browser]) -- "HTML pages + htmx fragments<br/>(session cookie, CSRF)" --> app
+    user([User<br/>browser]) -- "HTML pages + htmx fragments<br/>(session cookie, CSRF)" --> app
     subgraph app [Spring Boot application - single deployable]
         direction TB
         web[Thymeleaf + htmx web adapters]
@@ -14,36 +14,35 @@ flowchart LR
         web --> modules
     end
     app -- "JDBC / Flyway" --> db[(PostgreSQL<br/>docker-compose)]
-    user -. "CDN" .-> cdn[Bootstrap 5, htmx, SortableJS]
 ```
 
 | Concern | Choice |
 | --- | --- |
 | Language / build | Java 25, Maven (wrapper) |
 | Framework | Spring Boot, Spring MVC, Spring Security, Spring Data JPA, Spring Modulith |
-| UI | Server-rendered Thymeleaf; htmx for fragments; Bootstrap 5 and SortableJS from CDN; no Node build |
+| UI | Server-rendered Thymeleaf; htmx for fragments; SortableJS on the board; both vendored under `static/js`; plain CSS in `static/css/app.css`; no Node build |
 | Database | PostgreSQL, schema owned by Flyway, `ddl-auto=validate` |
-| Runtime | Local only: `docker compose` for Postgres, app run with Maven |
+| Runtime | Local: `docker compose` for Postgres, app run with Maven or as a container (`Dockerfile`, compose profile `app`) |
 | Tests | JUnit Jupiter, AssertJ, MockMvc, Testcontainers (no H2), `ApplicationModules.verify()` |
 
 ## 2. Modules
 
-The application is a modular monolith. Each bounded context is a top-level package under the base package (provisionally `com.jiraclone`; fixed in the skeleton MR).
+The application is a modular monolith. Each bounded context is a top-level package under the base package `com.jiraclone`.
 
 | Module | Owns (tables) | Public API (root package) | Publishes | Spec |
 | --- | --- | --- | --- | --- |
-| `identity` | `app_user` | `IdentityApi`: current user, find user, list users, display names | — | [authentication](../specs/authentication-spec.md) |
-| `projects` | `project` | `ProjectsApi`: find project by key | — | [projects](../specs/projects-spec.md) |
-| `issues` | `issue`, `issue_counter` | `IssuesApi`: find issue by key/number, list by ids, change status, mark updated | `IssueCreated`, `IssueFieldChanged` | [issues](../specs/issues-spec.md) |
+| `identity` | `app_user` | `IdentityApi`: current user, find user, list users (`UserRef`) | — | [authentication](../specs/authentication-spec.md) |
+| `projects` | `project` | `ProjectsApi`: find by key, find accessible, list accessible (`ProjectRef`, `ProjectAccess`); `ProjectMembership` port implemented by `issues` | — | [projects](../specs/projects-spec.md), [project access](../specs/project-access-spec.md) |
+| `issues` | `issue`, `issue_counter`, `issue_assignee` | `IssuesApi`: find issue, list by ids/project, counts by status, change status, mark updated; also the dashboard (`/`) and assignees | `IssueCreated`, `IssueFieldChanged` | [issues](../specs/issues-spec.md), [project access](../specs/project-access-spec.md) |
 | `board` | — | — (web only) | — | [board](../specs/board-spec.md) |
 | `comments` | `comment` | — (web only) | — | [comments](../specs/comments-spec.md) |
 | `history` | `issue_history` | — (web + listeners) | — | [activity-history](../specs/activity-history-spec.md) |
-| `sprints` | `sprint`, `sprint_issue` | `SprintsApi`: issue ids in a sprint / in any sprint, sprint of an issue | `IssueSprintChanged` | [sprints](../specs/sprints-spec.md) |
-| `common` | — | Shared layout, `@ControllerAdvice` (404/422), htmx helpers, security config | — | — |
+| `sprints` | `sprint`, `sprint_issue` | `SprintsApi`: list sprints, issue ids for a board filter | `IssueSprintChanged` | [sprints](../specs/sprints-spec.md) |
+| `common` | — | `GlobalExceptionHandler` (403/404), error views, htmx authentication entry point, `SecurityConfig` | — | — |
 
 ### Allowed dependencies
 
-Arrows read "depends on". Solid = synchronous `*Api` call; dashed = listens to events. Every module may use `common`. The graph is acyclic; `ApplicationModules.verify()` enforces it.
+Arrows read "depends on". Solid = synchronous `*Api` call; dashed = listens to events. Every module may use `common` and `identity`. `projects` decides access through its `ProjectMembership` port, which `issues` implements (membership is derived from assignments), so `projects` does not depend on `issues`. The graph is acyclic; `ApplicationModules.verify()` enforces it.
 
 ```mermaid
 flowchart TD
@@ -51,13 +50,13 @@ flowchart TD
     issues --> projects
     issues --> identity
     comments --> issues
-    comments --> identity
+    comments --> projects
     sprints --> issues
     sprints --> projects
     board --> issues
     board --> sprints
     board --> projects
-    history --> identity
+    history --> projects
     history -.->|IssueCreated, IssueFieldChanged| issues
     history -.->|IssueSprintChanged| sprints
 ```
@@ -74,27 +73,29 @@ Rules:
 ```text
 com.jiraclone
 ├── JiraCloneApplication.java
-├── common/                     layout, error handling, htmx helpers, SecurityConfig
+├── common/                     error handling, htmx auth entry point, SecurityConfig
 ├── identity/
 │   ├── IdentityApi.java
 │   ├── UserRef.java            (record: id, username, displayName)
 │   ├── core/                   AppUser entity, repository, UserDetailsService, IdentityApi impl
-│   └── web/                    LoginController
+│   └── web/                    LoginController, RegistrationController, CurrentUserAdvice
 ├── issues/
 │   ├── IssuesApi.java
 │   ├── IssueCreated.java, IssueFieldChanged.java
-│   ├── core/                   Issue entity, IssueCounter, IssueService (create, update field)
-│   └── web/                    list/detail/create/edit controllers, form DTOs
+│   ├── core/                   Issue entity, IssueCounter, IssueService (create, update field, assignees)
+│   └── web/                    issue, assignee and dashboard controllers, form DTOs
 ├── board/web/                  BoardController
 ├── comments/{core,web}/
 ├── history/{core,web}/         HistoryRecorder (@EventListener), HistoryController
 ├── sprints/
 │   ├── SprintsApi.java, IssueSprintChanged.java
 │   └── {core,web}/
-└── projects/{ProjectsApi.java, core/, web/}
+└── projects/
+    ├── ProjectsApi.java, ProjectMembership.java, ProjectRef.java, ProjectAccess.java
+    └── {core,web}/
 ```
 
-Templates follow the same ownership: `templates/<module>/...`; shared layout and error pages under `templates/common/`.
+Templates follow the same ownership: `templates/<module>/...`; shared layout under `templates/layout/`, error pages under `templates/common/`.
 
 ## 4. Web layer and htmx conventions
 

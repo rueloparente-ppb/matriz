@@ -1,6 +1,6 @@
 # UI Design
 
-This document describes the screens of the Jira clone MVP and records the low-fidelity wireframe of its main screen, the **Kanban board**. Behaviour is owned by the specs in [`specs/`](../../specs); the web conventions are in [`architecture.md`](../architecture.md).
+This document describes the screens of the Jira clone and records the low-fidelity wireframe of its main screen, the **Kanban board**. Behaviour is owned by the specs in [`specs/`](../../specs); the web conventions are in [`architecture.md`](../architecture.md).
 
 **Wireframe:** [`board-wireframe.html`](./board-wireframe.html). Open it in a browser; no server is needed. Cards can be dragged to try the interaction; nothing is saved.
 
@@ -10,7 +10,7 @@ This document describes the screens of the Jira clone MVP and records the low-fi
 
 | Aspect | Choice |
 | --- | --- |
-| Toolkit | Bootstrap 5 from CDN, default theme; no custom design system |
+| Toolkit | App: plain CSS (`static/css/app.css`), no design system. Wireframe: Bootstrap 5 from CDN, default theme |
 | Wireframe style | Greyscale, dashed boxes, handwritten-style font, yellow notes for behaviour |
 | Layout | Global navbar, then a project header with project tabs, then the page content |
 | Interaction | Links and forms work as plain HTML; htmx swaps fragments; SortableJS only on the board |
@@ -20,11 +20,13 @@ This document describes the screens of the Jira clone MVP and records the low-fi
 
 | Screen | URL | Spec | MR |
 | --- | --- | --- | --- |
-| Login | `/login` | AUTH | 1 |
-| Projects list and create | `/projects`, `/projects/new` | PRJ | 2 |
+| Login, register | `/login`, `/register` | AUTH | 1, — |
+| Dashboard (my projects and issues) | `/` | ACC | — |
+| Projects list (search, paging) and create | `/projects`, `/projects/new` | PRJ, ACC | 2, — |
+| Edit or delete project (owner only) | `/projects/{key}/edit`, `/projects/{key}/delete` | ACC | — |
 | Issue list (filters, search, paging) | `/projects/{key}/issues` | ISS | 3–4 |
 | Create issue | `/projects/{key}/issues/new` | ISS | 3 |
-| Issue detail (inline edit, comments, history, sprint) | `/projects/{key}/issues/{n}` | ISS, CMT, HST, SPR | 3, 5, 7, 8, 10 |
+| Issue detail (inline edit, assignees, comments, history, sprint) | `/projects/{key}/issues/{n}` | ISS, ASG, CMT, HST, SPR | 3, 5, 7, 8, 10, — |
 | **Kanban board** (wireframed) | `/projects/{key}/board` | BRD, SPR | 6, 10 |
 | Sprints | `/projects/{key}/sprints` | SPR | 9 |
 
@@ -78,7 +80,7 @@ Every element on the wireframe maps to a spec requirement, and every user-visibl
 
 | # | Element | Behaviour | Requirement |
 | --- | --- | --- | --- |
-| 1 | Navbar: Projects link | Back to all projects (every user sees every project) | PRJ-2 |
+| 1 | Navbar: Projects link | Back to the projects the user can access | PRJ-2, ACC |
 | 1 | Navbar: user name, Log out | Logout is a `POST` with CSRF; then the login page | AUTH-5, AUTH-6 |
 | 2 | Project tabs Issues, Board, Sprints | Move between the project's screens | ISS-9, BRD-1, SPR-17 |
 | 2 | + New issue | Opens the create form | ISS-1 |
